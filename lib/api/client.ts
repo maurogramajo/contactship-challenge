@@ -33,7 +33,8 @@ async function request<T>(url: string, options: FetchOptions = {}): Promise<T> {
 
   const data = await res.json().catch(() => null);
 
-  if (!res.ok && res.status === 401 && url !== "/api/auth/refresh") {
+  const isAuthEndpoint = url === "/api/auth/login" || url === "/api/auth/register";
+  if (!res.ok && res.status === 401 && url !== "/api/auth/refresh" && !isAuthEndpoint) {
     if (!refreshPromise) {
       refreshPromise = fetch("/api/auth/refresh", {
         method: "POST",
