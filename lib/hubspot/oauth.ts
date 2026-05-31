@@ -10,6 +10,12 @@ const HUBSPOT_OAUTH_SCOPES = [
   "oauth",
   "crm.objects.contacts.read",
   "crm.objects.contacts.write",
+  "crm.objects.companies.read",
+  "crm.objects.deals.read",
+  "crm.objects.deals.write",
+  "crm.objects.owners.read",
+  "crm.objects.leads.read",
+  "crm.objects.leads.write",
   "crm.objects.notes.write",
 ];
 
