@@ -51,13 +51,25 @@ interface ActionableData {
   summary: string | null;
   actions: string[];
   created_at: string;
+  recommended_channel?: string | null;
+  recommended_action?: string | null;
+  draft_message?: string | null;
+  reasoning?: string | null;
+}
+
+interface HubspotStatusResponse {
+  connected: boolean;
+  hubspotPortalId: string | null;
+  hubspotUserEmail: string | null;
+  hubspotHubDomain: string | null;
+  scopes: string[];
 }
 
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "not_found" }
-  | { status: "success"; contact: ContactDetail; actionables: ActionableData[] };
+  | { status: "success"; contact: ContactDetail; actionables: ActionableData[]; hubspotScopes: string[] };
 
 export default function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -68,12 +80,20 @@ export default function ContactDetailPage() {
       setState({ status: "loading" });
     }
     try {
-      const [contact, actionables] = await Promise.all([
+      const [contact, actionables, hubspotStatus] = await Promise.all([
         api.get<ContactDetail>(`/api/contacts/${id}`),
         api.get<ActionableData[]>(`/api/contacts/${id}/insights`),
+        api
+          .get<HubspotStatusResponse>("/api/hubspot/status")
+          .catch(() => null),
       ]);
 
-      setState({ status: "success", contact, actionables });
+      setState({
+        status: "success",
+        contact,
+        actionables,
+        hubspotScopes: hubspotStatus?.scopes ?? [],
+      });
     } catch (err) {
       if (err instanceof ApiError && err.code === 404) {
         setState({ status: "not_found" });
@@ -146,7 +166,7 @@ export default function ContactDetailPage() {
     );
   }
 
-  const { contact, actionables } = state;
+  const { contact, actionables, hubspotScopes } = state;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -163,7 +183,12 @@ export default function ContactDetailPage() {
         </div>
 
         <div className="space-y-6">
-          <InsightsPanel actionables={actionables} />
+          <InsightsPanel
+            actionables={actionables}
+            hubspotScopes={hubspotScopes}
+            contactId={id}
+            contactExternalId={contact.external_id}
+          />
           <GenerateInsightButton
             contactId={id}
             onSuccess={handleInsightGenerated}

@@ -8,6 +8,10 @@ interface ActionableData {
   summary: string | null;
   actions: string[];
   created_at: string;
+  recommended_channel?: string | null;
+  recommended_action?: string | null;
+  draft_message?: string | null;
+  reasoning?: string | null;
 }
 
 interface GenerateInsightButtonProps {

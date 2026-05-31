@@ -20,3 +20,4 @@ export {
   processWebhookEvent,
   type WebhookEvent,
 } from "./webhook";
+export { createHubSpotNote, HubSpotNotesError } from "./notes";

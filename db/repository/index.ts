@@ -30,3 +30,4 @@ export {
   updateHubSpotConnection,
   deleteHubSpotConnection,
 } from "./hubspot-connections";
+export { getAiSettings, upsertAiSettings } from "./organization-ai-settings";

@@ -4,18 +4,45 @@ import {
   getCommentsByContactId,
   getTagsByContactId,
 } from "@/db/repository";
+import { getAiSettings } from "@/db/repository/organization-ai-settings";
+import { getActionablesByContactId } from "@/db/repository/actionables";
 import type { InsightContext } from "./insights";
 
 export async function buildContactContext(
   contactId: string,
   organizationId: string,
+  options?: {
+    includeOrgSettings?: boolean;
+    includePreviousActionables?: boolean;
+  },
 ): Promise<InsightContext | null> {
-  const [contact, calls, comments, tags] = await Promise.all([
+  const fetchers: Promise<unknown>[] = [
     getContactById(contactId, organizationId),
     getCallsByContactId(contactId),
     getCommentsByContactId(contactId),
     getTagsByContactId(contactId),
-  ]);
+  ];
+
+  const orgSettingsPromise =
+    options?.includeOrgSettings
+      ? getAiSettings(organizationId)
+      : Promise.resolve(null);
+  const previousActionablesPromise =
+    options?.includePreviousActionables
+      ? getActionablesByContactId(contactId)
+      : Promise.resolve([] as Awaited<ReturnType<typeof getActionablesByContactId>>);
+
+  fetchers.push(orgSettingsPromise, previousActionablesPromise);
+
+  const [contact, calls, comments, tags, orgSettings, previousActionables] =
+    await Promise.all(fetchers) as [
+      Awaited<ReturnType<typeof getContactById>>,
+      Awaited<ReturnType<typeof getCallsByContactId>>,
+      Awaited<ReturnType<typeof getCommentsByContactId>>,
+      Awaited<ReturnType<typeof getTagsByContactId>>,
+      Awaited<ReturnType<typeof getAiSettings>>,
+      Awaited<ReturnType<typeof getActionablesByContactId>>,
+    ];
 
   if (!contact) return null;
 
@@ -23,7 +50,7 @@ export async function buildContactContext(
   const outboundCalls = calls.filter((c) => c.direction === "outbound");
   const answeredCalls = calls.filter((c) => c.status === "answered");
 
-  return {
+  const context: InsightContext = {
     contact: {
       full_name: contact.full_name,
       email: contact.email,
@@ -47,4 +74,19 @@ export async function buildContactContext(
     },
     tags: tags.map((t) => t.name),
   };
+
+  if (orgSettings) {
+    context.organizationObjective = orgSettings.objective;
+    context.organizationInstructions =
+      orgSettings.additional_instructions ?? undefined;
+  }
+
+  if (previousActionables.length > 0) {
+    context.previousActionables = previousActionables
+      .slice(0, 5)
+      .map((a) => a.summary)
+      .filter((s): s is string => s != null);
+  }
+
+  return context;
 }

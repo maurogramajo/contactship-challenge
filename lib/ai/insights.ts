@@ -1,6 +1,7 @@
 import { aiClient } from "./client";
-import { insightSchema } from "@/db/zod/insight";
 import type { Insight } from "@/db/zod/insight";
+import { actionableOutputSchema } from "@/db/zod/actionable-output";
+import type { ActionableOutput } from "@/db/zod/actionable-output";
 
 export interface ContactInfo {
   full_name?: string | null;
@@ -30,30 +31,53 @@ export interface InsightContext {
   calls: CallsStats;
   comments: CommentsStats;
   tags: string[];
+  organizationObjective?: string;
+  organizationInstructions?: string;
+  previousActionables?: string[];
 }
 
-const SYSTEM_PROMPT = `Eres un asistente de inteligencia comercial que analiza datos de contactos para un CRM. Tu tarea es generar información útil sobre un contacto basándote en los datos proporcionados.
+const SYSTEM_PROMPT = `Eres un asistente de inteligencia comercial que genera recomendaciones accionables alineadas con el objetivo de negocio de la organización.
+
+Recibes: el objetivo organizacional, instrucciones adicionales (si existen), datos del contacto, historial de actividad y recomendaciones previas.
 
 ## Formato de respuesta
 Responde ÚNICAMENTE con un objeto JSON válido. Sin explicaciones, sin markdown, sin texto adicional.
 
 El JSON debe tener exactamente estos campos:
-- summary: string — resumen del estado del contacto en una o dos frases en español. Describe el perfil, nivel de actividad y estado general.
-- actions: string[] — lista de 2 a 4 acciones recomendadas en español. Cada acción debe ser concreta y accionable.
+- summary: string — resumen del estado del contacto en español. Describe el perfil, nivel de actividad y estado general.
+- recommended_channel: string — el canal más adecuado según el objetivo y las instrucciones adicionales. Debe ser uno de: "whatsapp", "call", "email", "instagram".
+- recommended_action: string — acción concreta a ejecutar, alineada con el objetivo de negocio.
+- draft_message: string (opcional) — borrador del mensaje a enviar, en español profesional, listo para copiar y pegar.
+- reasoning: string (opcional) — explicación de por qué se recomienda esta acción, conectando el objetivo de negocio con los datos del contacto.
 
 ## Reglas
 1. Solo responde con JSON. Nada más.
-2. El summary debe ser contextual: menciona el país, fuente, nivel de actividad, etiquetas relevantes.
-3. Las acciones deben ser específicas según los datos. Si no hay llamadas, sugiere llamar. Si tiene etiqueta "vip", prioriza seguimiento personalizado.
-4. Si hay poca información, sugiere recopilar más datos.
-5. Todo en español, tono profesional.`;
+2. El canal debe alinearse con las instrucciones adicionales si existen.
+3. Las acciones deben ser específicas según el objetivo de negocio.
+4. draft_message debe ser un mensaje listo para enviar.
+5. reasoning debe explicar la conexión entre el objetivo y la acción.
+6. Todo en español, tono profesional.`;
 
 const TIMEOUT_MS = 15000;
 
 function buildContextPrompt(ctx: InsightContext): string {
   const { contact, calls, comments, tags } = ctx;
 
-  const lines: string[] = ["## Datos del contacto"];
+  const lines: string[] = [];
+
+  if (ctx.organizationObjective) {
+    lines.push("## Objetivo organizacional");
+    lines.push(ctx.organizationObjective);
+    lines.push("");
+  }
+
+  if (ctx.organizationInstructions) {
+    lines.push("## Instrucciones adicionales");
+    lines.push(ctx.organizationInstructions);
+    lines.push("");
+  }
+
+  lines.push("## Datos del contacto");
 
   if (contact.full_name) lines.push(`Nombre: ${contact.full_name}`);
   if (contact.email) lines.push(`Email: ${contact.email}`);
@@ -80,12 +104,20 @@ function buildContextPrompt(ctx: InsightContext): string {
     lines.push(`## Etiquetas: ${tags.join(", ")}`);
   }
 
+  if (ctx.previousActionables && ctx.previousActionables.length > 0) {
+    lines.push("");
+    lines.push("## Recomendaciones anteriores");
+    for (const summary of ctx.previousActionables) {
+      lines.push(`- ${summary}`);
+    }
+  }
+
   return lines.join("\n");
 }
 
 export async function generateContactInsight(
   context: InsightContext
-): Promise<Insight | { error: string }> {
+): Promise<{ insight: Insight; prompt: string; output: ActionableOutput } | { error: string }> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -115,8 +147,17 @@ export async function generateContactInsight(
     }
 
     const parsed = JSON.parse(raw);
-    const result = insightSchema.parse(parsed);
-    return result;
+    const output = actionableOutputSchema.parse(parsed);
+    const insight: Insight = {
+      summary: output.summary,
+      actions: [output.recommended_action],
+    };
+
+    return {
+      insight,
+      prompt: userMessage,
+      output,
+    };
   } catch (err) {
     if (err instanceof DOMException && err.name === "AbortError") {
       console.error("[ai/insights] AI request timed out");

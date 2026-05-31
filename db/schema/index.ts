@@ -7,6 +7,7 @@ import { contactActionables } from "./contact-actionables";
 import { organizations } from "./organizations";
 import { organizationRefreshTokens } from "./organization-refresh-tokens";
 import { hubspotConnections } from "./hubspot-connections";
+import { organizationAiSettings } from "./organization-ai-settings";
 
 // ── Contacts ──────────────────────────────────────────────────────────────
 
@@ -68,9 +69,10 @@ export const contactTagsRelations = relations(contactTags, ({ one }) => ({
 
 // ── Organizations ─────────────────────────────────────────────────────────
 
-export const organizationsRelations = relations(organizations, ({ many }) => ({
+export const organizationsRelations = relations(organizations, ({ many, one }) => ({
   refreshTokens: many(organizationRefreshTokens),
   hubspotConnections: many(hubspotConnections),
+  aiSettings: one(organizationAiSettings),
 }));
 
 // ── Refresh Tokens ────────────────────────────────────────────────────────
@@ -97,6 +99,18 @@ export const hubspotConnectionsRelations = relations(
   }),
 );
 
+// ── Organization AI Settings ─────────────────────────────────────────────
+
+export const organizationAiSettingsRelations = relations(
+  organizationAiSettings,
+  ({ one }) => ({
+    organization: one(organizations, {
+      fields: [organizationAiSettings.organization_id],
+      references: [organizations.id],
+    }),
+  }),
+);
+
 // ── Re-exports ────────────────────────────────────────────────────────────
 
 export { contacts } from "./contacts";
@@ -107,6 +121,7 @@ export { contactActionables } from "./contact-actionables";
 export { organizations } from "./organizations";
 export { organizationRefreshTokens } from "./organization-refresh-tokens";
 export { hubspotConnections } from "./hubspot-connections";
+export { organizationAiSettings } from "./organization-ai-settings";
 
 export type { Contact, NewContact } from "./contacts";
 export type { Call, NewCall } from "./calls";
@@ -121,6 +136,10 @@ export type {
   HubSpotConnection,
   NewHubSpotConnection,
 } from "./hubspot-connections";
+export type {
+  OrganizationAiSettings,
+  NewOrganizationAiSettings,
+} from "./organization-ai-settings";
 export type {
   ContactActionable,
   NewContactActionable,

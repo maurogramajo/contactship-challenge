@@ -49,7 +49,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const context = await buildContactContext(localContact.id, organization.id);
+    const context = await buildContactContext(localContact.id, organization.id, {
+      includeOrgSettings: true,
+      includePreviousActionables: true,
+    });
     if (!context) {
       return NextResponse.json(
         { error: "Contact not found", code: 404 },
@@ -57,22 +60,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const insight = await generateContactInsight(context);
-    if ("error" in insight) {
+    const result = await generateContactInsight(context);
+    if ("error" in result) {
       return NextResponse.json(
         { error: "AI service unavailable", code: 503 },
         { status: 503, headers: NO_STORE }
       );
     }
 
-    const prompt = `Analiza el contacto "${context.contact.full_name || "sin nombre"}" con base en su perfil (${context.contact.country || "sin país"}, origen ${context.contact.source || "desconocido"}), historial de llamadas (${context.calls.total} total, ${Math.round(context.calls.answeredRate * 100)}% respondidas), ${context.comments.count} comentarios, y etiquetas: ${context.tags.length > 0 ? context.tags.join(", ") : "ninguna"}. Genera un resumen ejecutivo y acciones recomendadas.`;
+    const { insight, prompt, output } = result;
 
     const actionable = await createActionable({
       contact_id: localContact.id,
+      organization_id: organization.id,
       prompt,
       summary: insight.summary,
       actions: insight.actions,
       snapshot: JSON.parse(JSON.stringify(context)) as Record<string, unknown>,
+      recommended_channel: output.recommended_channel,
+      recommended_action: output.recommended_action,
+      draft_message: output.draft_message,
+      reasoning: output.reasoning,
     });
 
     return NextResponse.json(

@@ -10,6 +10,7 @@ const HUBSPOT_OAUTH_SCOPES = [
   "oauth",
   "crm.objects.contacts.read",
   "crm.objects.contacts.write",
+  "crm.objects.notes.write",
 ];
 
 type TokenResponse = {

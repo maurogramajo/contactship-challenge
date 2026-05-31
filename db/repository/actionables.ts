@@ -6,8 +6,21 @@ import {
 } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
+export interface CreateActionableInput {
+  contact_id: string;
+  prompt: string;
+  summary?: string | null;
+  actions: string[];
+  snapshot?: Record<string, unknown> | null;
+  organization_id?: string | null;
+  recommended_channel?: string | null;
+  recommended_action?: string | null;
+  draft_message?: string | null;
+  reasoning?: string | null;
+}
+
 export async function createActionable(
-  data: NewContactActionable
+  data: CreateActionableInput
 ): Promise<ContactActionable> {
   const result = await db
     .insert(contactActionables)
