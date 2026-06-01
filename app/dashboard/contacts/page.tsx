@@ -192,27 +192,39 @@ export default function ContactsPage() {
   return (
     <div className="space-y-6 p-6">
       <section className="space-y-5 rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-6 shadow-[0_20px_40px_-28px_rgba(15,23,42,0.18)]">
-        <div className="relative flex flex-col gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
-            Contactos
-          </h1>
-        </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <div className="max-w-3xl space-y-3">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="relative flex flex-col gap-2">
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-950">
+              Contactos
+            </h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
               Busca coincidencias por nombre, email o teléfono.
             </p>
-            <SearchBar
-              value={search}
-              onChange={handleSearchChange}
-              placeholder="Buscar por nombre, email o teléfono"
-              debounceMs={250}
-            />
-            <div className="flex flex-wrap gap-3">
+          </div>
+          <div className="h-fit rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:min-w-32 sm:self-start">
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
+              Total
+            </p>
+            <p className="mt-0.5 text-2xl font-semibold leading-none text-slate-950">
+              {result && !loading ? result.total : "—"}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex min-w-0 flex-1">
+            <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-center">
+              <div className="min-w-0 flex-1 xl:max-w-3xl">
+                <SearchBar
+                  value={search}
+                  onChange={handleSearchChange}
+                  placeholder="Buscar por nombre, email o teléfono"
+                  debounceMs={250}
+                />
+              </div>
               <select
                 value={lifecycleStage}
                 onChange={(e) => handleLifecycleStageChange(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 xl:min-w-56"
               >
                 <option value="">Todos los lifecycles</option>
                 {HUBSPOT_LIFECYCLE_STAGE_VALUES.map((stage) => (
@@ -224,7 +236,7 @@ export default function ContactsPage() {
               <select
                 value={leadStatus}
                 onChange={(e) => handleLeadStatusChange(e.target.value)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm focus:border-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-400 xl:min-w-56"
               >
                 <option value="">Todos los estados</option>
                 {HUBSPOT_LEAD_STATUS_VALUES.map((status) => (
@@ -235,7 +247,7 @@ export default function ContactsPage() {
               </select>
             </div>
           </div>
-          <div className="flex flex-col gap-3 lg:items-end">
+          <div className="lg:shrink-0">
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
@@ -243,14 +255,6 @@ export default function ContactsPage() {
             >
               Crear contacto
             </button>
-            <div className="h-fit rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm lg:min-w-32">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-slate-500">
-                Encontrados
-              </p>
-              <p className="mt-0.5 text-2xl font-semibold leading-none text-slate-950">
-                {result && !loading ? result.total : "—"}
-              </p>
-            </div>
           </div>
         </div>
         {feedbackMessage ? (

@@ -43,9 +43,9 @@ cp .env.example .env.local
 #    - AI_MODEL: modelo a usar (ej. deepseek-chat, gpt-4o)
 #    - AUTH_SECRET: secreto de al menos 32 caracteres para firmar JWT
 #    - HUBSPOT_CLIENT_ID, HUBSPOT_CLIENT_SECRET, HUBSPOT_REDIRECT_URI
+#    - WEBHOOK_SECRET: secreto usado para validar webhooks de HubSpot
 #    Opcionales:
 #    - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
-#    - WEBHOOK_SECRET
 
 # 4. Instalar dependencias
 bun install
@@ -101,7 +101,7 @@ Si estás desarrollando la cola de sincronización, la forma más simple es:
 ```
 app/                      # Next.js App Router
   api/                    # Endpoints REST
-    ai/                   #   Análisis y búsqueda NL de contactos
+    ai/                   #   Generación de insights y acciones sugeridas
     auth/                 #   Registro, login, logout, sesión
     contacts/             #   CRUD de contactos, comentarios, llamadas
     hubspot/              #   OAuth callback, connect/disconnect, status, sync
@@ -128,7 +128,7 @@ db/                       # Capa de datos
   seed.ts                 #   Script de carga de datos de prueba
 
 lib/                      # Lógica de negocio
-  ai/                     #   Cliente de IA (búsqueda NL, generación de insights)
+  ai/                     #   Cliente de IA para insights y clasificación
   api/                    #   Cliente HTTP tipado para consumir la API desde el frontend
   hubspot/                #   Cliente de HubSpot (sync, mapeo de propiedades)
   auth.ts                 #   Hashing de passwords, firma/verificación de JWT
@@ -154,9 +154,9 @@ La API pública de ContactShip modela los contactos por `organization_id`, no po
 
 En lugar de un token estático global, cada organización autentica su propia cuenta de HubSpot vía OAuth. La restricción deliberada es `1 organización local -> 1 cuenta HubSpot`. Si la organización ya está vinculada, solo se permite reautorizar la misma cuenta; para cambiarla, primero hay que desconectarla. Este recorte reduce superficie de errores y hace más defendible la trazabilidad durante la demo.
 
-### 4. Búsqueda en lenguaje natural con la BD como fuente de verdad
+### 4. Búsqueda clásica por texto + filtros
 
-Cuando un usuario escribe una consulta como "clientes inactivos de México", el LLM no responde directamente. En cambio, traduce la consulta a filtros estructurados (`SearchFilters`) que se ejecutan contra PostgreSQL. El LLM actúa como intérprete, no como base de conocimiento. Esto evita alucinaciones, mantiene los datos reales como fuente de verdad, y permite que los filtros sean auditables y depurables. Si el LLM falla, la búsqueda degrada con gracia devolviendo todos los contactos.
+La búsqueda de contactos del challenge es deliberadamente simple: combina un término libre (`search`) con filtros explícitos de `lifecycle_stage` y `lead_status`. La consulta se resuelve contra la base local y, cuando corresponde, contra HubSpot, sin traducción intermedia por LLM. Para este alcance prioricé una experiencia predecible, fácil de auditar y consistente con el tiempo disponible del challenge.
 
 ### 5. Insights on-demand, no automáticos
 
@@ -213,7 +213,7 @@ Este proyecto está preparado para desplegarse en Netlify como app Next.js y par
    - `HUBSPOT_CLIENT_ID`
    - `HUBSPOT_CLIENT_SECRET`
    - `HUBSPOT_REDIRECT_URI`
-   - `WEBHOOK_SECRET` si querés validar webhooks
+   - `WEBHOOK_SECRET`
 4. Usá estos valores de build:
    - Build command: `bun run build`
    - Publish directory: dejar vacío para Next.js en Netlify

@@ -174,8 +174,15 @@ function getChannelConfig(channel: string | null | undefined): {
 function getActionButtonLabel(action: ActionableAction, isLoading: boolean) {
   if (isLoading) return "Ejecutando...";
   if (action.status === "executed") return "Sincronizada";
-  if (action.status === "pending") return "Reintentar sincronización";
+  if (action.status === "pending") return "Pendiente de sincronización";
   return ACTION_CONFIG[action.type].button;
+}
+
+function isActionExecutionLocked(
+  action: ActionableAction,
+  isLoading: boolean,
+) {
+  return isLoading || action.status === "executed" || action.status === "pending";
 }
 
 function ChevronLeft() {
@@ -448,6 +455,10 @@ export function InsightsPanel({
                   const statusConfig = STATUS_CONFIG[action.status];
                   const actionConfig = ACTION_CONFIG[action.type];
                   const isLoading = loadingActions[actionKey] ?? false;
+                  const isActionDisabled = isActionExecutionLocked(
+                    action,
+                    isLoading,
+                  );
 
                   return (
                     <li
@@ -477,7 +488,7 @@ export function InsightsPanel({
 
                       <button
                         type="button"
-                        disabled={isLoading}
+                        disabled={isActionDisabled}
                         onClick={() =>
                           void handleExecuteAction(currentInsight.id, action.id)
                         }

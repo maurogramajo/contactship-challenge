@@ -4,11 +4,9 @@ import {
   processWebhookEvent,
   type WebhookEvent,
 } from "@/lib/hubspot/webhook";
+import { requireEnv } from "@/lib/required-env";
 
-const WEBHOOK_SECRET =
-  process.env.WEBHOOK_SECRET ??
-  process.env.HUBSPOT_CLIENT_SECRET ??
-  "dev-secret-placeholder-key";
+const WEBHOOK_SECRET = requireEnv("WEBHOOK_SECRET");
 
 const TIMESTAMP_MAX_AGE_MS = 300_000; // 5 minutes
 

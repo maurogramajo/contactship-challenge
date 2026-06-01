@@ -1,9 +1,9 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { requireEnv } from "@/lib/required-env";
 
-const JWT_SECRET = process.env.AUTH_SECRET ??
-  "FLDSMDFR_FLINT_LOCO_LLUVIA_DE_HAMBURGUESAS";
+const JWT_SECRET = requireEnv("AUTH_SECRET", { minLength: 32 });
 const PASSWORD_SALT_ROUNDS = 10;
 
 type VerifyableTokenPayload = Record<string, unknown>;
