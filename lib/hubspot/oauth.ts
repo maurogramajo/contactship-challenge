@@ -16,7 +16,6 @@ const HUBSPOT_OAUTH_SCOPES = [
   "crm.objects.owners.read",
   "crm.objects.leads.read",
   "crm.objects.leads.write",
-  "crm.objects.notes.write",
 ];
 
 type TokenResponse = {
