@@ -147,13 +147,9 @@ La API pública de ContactShip modela los contactos por `organization_id`, no po
 
 En lugar de un token estático global, cada organización autentica su propia cuenta de HubSpot vía OAuth. La restricción deliberada es `1 organización local -> 1 cuenta HubSpot`. Si la organización ya está vinculada, solo se permite reautorizar la misma cuenta; para cambiarla, primero hay que desconectarla. Este recorte reduce superficie de errores y hace más defendible la trazabilidad durante la demo.
 
-### 4. Búsqueda clásica por texto + filtros
-
-La búsqueda de contactos del challenge es deliberadamente simple: combina un término libre (`search`) con filtros explícitos de `lifecycle_stage` y `lead_status`. La consulta se resuelve contra la base local y, cuando corresponde, contra HubSpot, sin traducción intermedia por LLM. Para este alcance prioricé una experiencia predecible, fácil de auditar y consistente con el tiempo disponible del challenge.
+### 4. Listado HubSpot-first
 
 Con HubSpot conectado, el listado es **HubSpot-first**: la API pide una página remota acotada (`limit` por defecto: 30), enriquece esos contactos con la proyección local existente por `external_id`, y agrega como overlay los contactos locales sin `external_id` que todavía están pendientes de sincronización. La app no descarga todo HubSpot para paginar en memoria; usa cursor remoto (`after` / `nextAfter`) y acepta que el `total` global combinado sea aproximado cuando la fuente principal es HubSpot.
-
-La búsqueda por teléfono en el listado es exploratoria. Si el término parece un teléfono parcial, se usa HubSpot Search con filtros `CONTAINS_TOKEN` sobre `phone` y `mobilephone` con variantes normalizadas/sufijos, porque el `query` genérico de HubSpot no encuentra de forma confiable substrings como `58590707`. Esto no cambia la política de deduplicación: para evitar duplicados, el email sigue siendo el identificador fuerte y el teléfono se compara por exactitud normalizada como fallback.
 
 ### 5. Insights on-demand, no automáticos
 

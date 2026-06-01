@@ -2,12 +2,13 @@
 
 import { useEffect, useId } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, Controller } from "react-hook-form";
 import {
   createContactInputSchema,
   type CreateContactInput,
 } from "@/db/zod";
 import { api, ApiError } from "@/lib/api/client";
+import { VoiceTextarea } from "@/components/ui/voice-textarea";
 
 type CreatedContact = {
   id: string;
@@ -223,11 +224,18 @@ export function CreateContactModal({
           </div>
 
           <FormField label="Descripcion" error={errors.description?.message}>
-            <textarea
-              {...register("description")}
-              rows={4}
-              placeholder="Contexto util para el equipo comercial o de soporte."
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none transition focus:border-slate-950"
+            <Controller
+              name="description"
+              control={control}
+              render={({ field }) => (
+                <VoiceTextarea
+                  id="contact-description"
+                  rows={4}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Contexto util para el equipo comercial o de soporte."
+                />
+              )}
             />
           </FormField>
 

@@ -107,10 +107,19 @@ function generateEmail(firstName: string, lastName: string, testNumber: number, 
   });
 }
 
-/** Generate a realistic phone number. */
+const LATAM_COUNTRY_CODES: Record<string, string> = {
+  AR: "+54",
+  CL: "+56",
+  MX: "+52",
+  CO: "+57",
+  PE: "+51",
+};
+
 function generatePhone(): string {
-  // Remove extension suffix (e.g. "x1234") that faker sometimes adds
-  return faker.phone.number().replace(/\s*x\d+$/i, "");
+  const code = faker.helpers.arrayElement(Object.values(LATAM_COUNTRY_CODES));
+  const localLength = faker.number.int({ min: 8, max: 10 });
+  const local = Array.from({ length: localLength }, () => faker.number.int({ min: 0, max: 9 })).join("");
+  return `${code}${local}`;
 }
 
 // ─── Date Helpers ────────────────────────────────────────────────────────────

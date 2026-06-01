@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, api } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
+import { VoiceTextarea } from "@/components/ui/voice-textarea";
 
 type ConnectionStatus = "idle" | "testing" | "success" | "error";
 
@@ -273,9 +274,51 @@ export default function SettingsPage() {
 
       {/* AI Settings Card */}
       <div className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-card space-y-6">
-        <h1 className="text-lg font-semibold text-text-primary">
-          Configuración de IA
-        </h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="text-lg font-semibold text-text-primary">
+            Configuración de IA
+          </h1>
+
+          <div className="group relative shrink-0">
+            <button
+              type="button"
+              aria-label="Ayuda sobre configuración de IA"
+              className="grid size-8 place-items-center rounded-full text-text-tertiary transition-colors hover:bg-primary-light hover:text-primary"
+            >
+              <svg
+                className="size-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <path d="M12 17h.01" />
+              </svg>
+            </button>
+
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border bg-surface p-4 text-sm leading-relaxed text-text-secondary opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              <p className="font-medium text-text-primary mb-2">¿Para qué sirven estos campos?</p>
+              <p className="mb-2">
+                <strong className="text-text-primary">Objetivo principal:</strong> define el
+                contexto de negocio que la IA usa para personalizar los insights y las acciones
+                recomendadas. Cuanto más específico, más relevantes serán las sugerencias.
+              </p>
+              <p>
+                <strong className="text-text-primary">Instrucciones adicionales:</strong> reglas o
+                preferencias que la IA debe considerar al generar recomendaciones, como el canal
+                de contacto preferido, tono de comunicación, o restricciones del negocio.
+              </p>
+            </div>
+          </div>
+        </div>
 
         <div className="space-y-1.5">
           <label
@@ -284,15 +327,14 @@ export default function SettingsPage() {
           >
             Objetivo principal
           </label>
-          <textarea
+          <VoiceTextarea
             id="ai-objective"
             rows={3}
             maxLength={1000}
             value={aiObjective}
-            onChange={(e) => setAiObjective(e.target.value)}
-            placeholder="Ej: Vender software odontológico a clínicas de Latinoamérica"
+            onChange={setAiObjective}
+            placeholder="Ej: Automatizar la calificación de leads entrantes y agendar demos de agentes IA en Latinoamérica"
             disabled={!aiLoaded}
-            className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y disabled:opacity-50"
           />
           <p className="text-xs text-text-tertiary text-right">
             {aiObjective.length} / 1000
@@ -306,15 +348,14 @@ export default function SettingsPage() {
           >
             Instrucciones adicionales
           </label>
-          <textarea
+          <VoiceTextarea
             id="ai-instructions"
             rows={4}
             maxLength={2000}
             value={aiInstructions}
-            onChange={(e) => setAiInstructions(e.target.value)}
-            placeholder="Ej: Priorizar WhatsApp como canal principal"
+            onChange={setAiInstructions}
+            placeholder="Ej: Priorizar llamadas salientes para leads que ya interactuaron con el agente de voz"
             disabled={!aiLoaded}
-            className="w-full rounded-lg border border-border bg-surface-secondary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y disabled:opacity-50"
           />
           <p className="text-xs text-text-tertiary text-right">
             {aiInstructions.length} / 2000
