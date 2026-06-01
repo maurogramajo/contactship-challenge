@@ -2,6 +2,12 @@
 
 Integración entre ContactShip y HubSpot que permite gestionar contactos desde un panel unificado, sincronizar datos desde el CRM y obtener insights generados por IA sobre cada contacto. Construida como prueba técnica para el rol de Lead Engineer en ContactShip AI.
 
+## Deploy productivo
+
+- App desplegada: https://mauro-contactship.netlify.app/
+- Acceso: crear una cuenta desde `/register` o iniciar sesión desde `/login` con una cuenta previamente creada.
+- Demo recomendada: registrar una organización, conectar HubSpot desde `Dashboard -> Settings`, generar data de prueba desde `Dashboard -> Test`, listar contactos, crear un contacto, generar un insight y ejecutar una acción sugerida contra HubSpot.
+
 ## Stack tecnológico
 
 | Capa | Tecnología |

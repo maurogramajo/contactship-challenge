@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 // ── SpeechRecognition type shim ──────────────────────────────────────
 
@@ -22,11 +22,15 @@ type SpeechRecognitionLike = {
   onresult: ((event: SpeechRecognitionEventLike) => void) | null;
   onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
   onend: (() => void) | null;
+  onspeechend: (() => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
 };
 type SpeechRecognitionConstructorLike = new () => SpeechRecognitionLike;
+
+const AUTO_STOP_AFTER_RESULT_SILENCE_MS = 1800;
+const AUTO_STOP_AFTER_SPEECH_END_MS = 700;
 
 function getSpeechRecognitionConstructor(): SpeechRecognitionConstructorLike | null {
   if (typeof window === "undefined") return null;
@@ -35,6 +39,18 @@ function getSpeechRecognitionConstructor(): SpeechRecognitionConstructorLike | n
     webkitSpeechRecognition?: SpeechRecognitionConstructorLike;
   };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+function subscribeToSpeechRecognitionSupport() {
+  return () => {};
+}
+
+function getSpeechRecognitionSupportSnapshot() {
+  return getSpeechRecognitionConstructor() !== null;
+}
+
+function getServerSpeechRecognitionSupportSnapshot() {
+  return false;
 }
 
 // ── Props ────────────────────────────────────────────────────────────
@@ -65,26 +81,45 @@ export function VoiceTextarea({
   lang = "es-AR",
 }: VoiceTextareaProps) {
   const [isListening, setIsListening] = useState(false);
-  const [supportsMic, setSupportsMic] = useState(false);
+  const supportsMic = useSyncExternalStore(
+    subscribeToSpeechRecognitionSupport,
+    getSpeechRecognitionSupportSnapshot,
+    getServerSpeechRecognitionSupportSnapshot,
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const baseValueRef = useRef("");
   const finalTextRef = useRef("");
 
-  useEffect(() => {
-    setSupportsMic(getSpeechRecognitionConstructor() !== null);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      recognitionRef.current?.abort();
-    };
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
   }, []);
 
   const stopListening = useCallback(() => {
+    clearSilenceTimer();
     recognitionRef.current?.stop();
     setIsListening(false);
-  }, []);
+  }, [clearSilenceTimer]);
+
+  const scheduleAutoStop = useCallback((delayMs: number) => {
+    clearSilenceTimer();
+    silenceTimerRef.current = setTimeout(() => {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      silenceTimerRef.current = null;
+    }, delayMs);
+  }, [clearSilenceTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearSilenceTimer();
+      recognitionRef.current?.abort();
+    };
+  }, [clearSilenceTimer]);
 
   const startListening = useCallback(() => {
     if (disabled || isListening) return;
@@ -104,10 +139,12 @@ export function VoiceTextarea({
 
       recognition.onresult = (event) => {
         let interimText = "";
+        let hasTranscript = false;
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const result = event.results[i];
           const t = result[0]?.transcript?.trim() ?? "";
           if (!t) continue;
+          hasTranscript = true;
           if (result.isFinal) {
             finalTextRef.current = `${finalTextRef.current} ${t}`.trim();
           } else {
@@ -120,22 +157,43 @@ export function VoiceTextarea({
           .join(" ")
           .trim();
         onChange(fullText);
+        if (hasTranscript) {
+          scheduleAutoStop(AUTO_STOP_AFTER_RESULT_SILENCE_MS);
+        }
       };
 
       recognition.onerror = (event) => {
+        clearSilenceTimer();
         if (event.error && !["aborted", "no-speech"].includes(event.error)) {
           console.warn("[VoiceTextarea] Speech recognition error:", event.error);
         }
         setIsListening(false);
       };
 
-      recognition.onend = () => setIsListening(false);
+      recognition.onspeechend = () => {
+        scheduleAutoStop(AUTO_STOP_AFTER_SPEECH_END_MS);
+      };
+
+      recognition.onend = () => {
+        clearSilenceTimer();
+        setIsListening(false);
+      };
       recognition.start();
       setIsListening(true);
     } catch {
+      clearSilenceTimer();
       setIsListening(false);
     }
-  }, [disabled, isListening, lang, onChange, stopListening, value]);
+  }, [
+    clearSilenceTimer,
+    disabled,
+    isListening,
+    lang,
+    onChange,
+    scheduleAutoStop,
+    stopListening,
+    value,
+  ]);
 
   const toggleListening = useCallback(() => {
     if (isListening) {

@@ -410,7 +410,7 @@ const COMMENT_TEMPLATES: Array<(ctx: ContentContext) => CommentContent> = [
     content: `${firstName(c)} tiene alto potencial. Empresa en ${c.industry} con necesidad clara de ${c.product}. Prioridad alta.`,
     userName: faker.person.fullName(),
   }),
-  (_c) => ({
+  () => ({
     content: `Ojo con este contacto: pidió no ser contactado fuera de horario laboral. Prefiere comunicación por email.`,
     userName: faker.person.fullName(),
   }),
