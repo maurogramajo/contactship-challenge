@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getCallsByContactId,
   getCommentsByContactId,
-  getTagsByContactId,
 } from "@/db/repository";
 import {
   getLocalMaterializedContactByIdentifier,
@@ -41,13 +40,12 @@ export async function GET(
       );
     }
 
-    const [calls, comments, tags] = localContact
+    const [calls, comments] = localContact
       ? await Promise.all([
           getCallsByContactId(localContact.id, 20),
           getCommentsByContactId(localContact.id, 20),
-          getTagsByContactId(localContact.id),
         ])
-      : [[], [], []];
+      : [[], []];
 
     const hubspotActivity = await getHubSpotContactActivity(id, organization.id);
     const timeline = buildContactshipTimeline({
@@ -61,9 +59,9 @@ export async function GET(
         ...contact,
         calls,
         comments,
-        tags,
         hubspotNotes: hubspotActivity.notes,
         hubspotTasks: hubspotActivity.tasks,
+        hubspotMeetings: hubspotActivity.meetings,
         hubspotActivityError: hubspotActivity.error,
         hasHubSpotContact: hubspotActivity.hasHubSpotContact,
         timeline,

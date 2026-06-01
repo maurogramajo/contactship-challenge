@@ -53,19 +53,13 @@ bun install
 # 5. Ejecutar migraciones
 bun run db:migrate
 
-# 6. Cargar datos de prueba (80 contactos, 320 llamadas, 200 comentarios)
-bun run db:seed
-
-# 7. Iniciar servidor de desarrollo
+# 6. Iniciar servidor de desarrollo
 bun run dev
 ```
 
 La app estará disponible en `http://localhost:3000`.
 
-El seed crea una cuenta demo para entrar rápido al dashboard:
-
-- Email: `demo@contactship.local`
-- Password: `demo123456`
+La data de prueba se crea desde `/dashboard/test` segun el estado de HubSpot.
 
 ## Desarrollo local
 
@@ -125,7 +119,6 @@ db/                       # Capa de datos
   repository/             #   Funciones de acceso a datos tipadas
   index.ts                #   Re-export del módulo de base de datos
   migrate.ts              #   Runner de migraciones
-  seed.ts                 #   Script de carga de datos de prueba
 
 lib/                      # Lógica de negocio
   ai/                     #   Cliente de IA para insights y clasificación
@@ -203,7 +196,6 @@ Las rutas de la App Router (`app/api/`) exponen una API REST consumida tanto por
 | `bun run test` | Corre los tests con Bun |
 | `bun run db:generate` | Genera archivos de migración desde los schemas |
 | `bun run db:migrate` | Ejecuta las migraciones pendientes |
-| `bun run db:seed` | Carga datos de prueba en la base de datos |
 | `bun run db:studio` | Abre Drizzle Studio para explorar la BD |
 
 ## Despliegue en Netlify

@@ -7,7 +7,6 @@ export const searchFiltersSchema = z.object({
   lifecycle_stage: z.string().optional(),
   lead_status: z.string().optional(),
   has_activity_since: z.string().optional(),
-  has_tag: z.string().optional(),
   activity_type: z.enum(["call", "comment", "none"]).optional(),
   min_calls: z.number().optional(),
   max_days_inactive: z.number().optional(),

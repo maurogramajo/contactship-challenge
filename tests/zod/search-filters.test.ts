@@ -8,7 +8,6 @@ describe("searchFiltersSchema", () => {
       email_contains: "gmail",
       source: "hubspot",
       has_activity_since: "2025-01-01",
-      has_tag: "vip",
       activity_type: "call",
       min_calls: 3,
       max_days_inactive: 30,

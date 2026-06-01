@@ -2,23 +2,26 @@ import {
   pgTable,
   uuid,
   varchar,
-  text,
   timestamp,
   integer,
   index,
   pgEnum,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { contacts } from "./contacts";
 
 export const directionEnum = pgEnum("call_direction", ["inbound", "outbound"]);
-export const statusEnum = pgEnum("call_status", [
-  "answered",
-  "missed",
-  "rejected",
-  "busy",
-  "failed",
-]);
+
+export type CallAnalysis = {
+  summary?: string | null;
+  sentiment?: string | null;
+};
+
+export type CallChatMessage = {
+  role: "agent" | "user" | "system" | string;
+  content: string;
+};
 
 export const calls = pgTable(
   "calls",
@@ -27,20 +30,29 @@ export const calls = pgTable(
       .default(sql`gen_random_uuid()`)
       .primaryKey(),
     created_at: timestamp("created_at").defaultNow().notNull(),
-    call_time: timestamp("call_time").notNull(),
-    duration: integer("duration"),
     direction: directionEnum("direction").notNull(),
-    status: statusEnum("status").notNull(),
-    notes: text("notes"),
-    recording_url: varchar("recording_url", { length: 1024 }),
+    from: varchar("from", { length: 255 }),
+    call_record: varchar("call_record", { length: 1024 }),
+    call_status: varchar("call_status", { length: 255 }).notNull(),
+    call_result: varchar("call_result", { length: 255 }),
+    disconnection_reason: varchar("disconnection_reason", { length: 255 }),
+    finished_at: timestamp("finished_at"),
+    start_at: timestamp("start_at").notNull(),
+    duration: integer("duration"),
+    call_analysis: jsonb("call_analysis").$type<CallAnalysis>(),
+    type: varchar("type", { length: 255 }).default("ai_call").notNull(),
+    agent_id: varchar("agent_id", { length: 255 }),
     contact_id: uuid("contact_id").references(() => contacts.id),
-    user_id: varchar("user_id", { length: 255 }),
+    chat_history: jsonb("chat_history").$type<CallChatMessage[]>().default([]).notNull(),
+    transcript_format: varchar("transcript_format", { length: 50 })
+      .default("json")
+      .notNull(),
     organization_id: varchar("organization_id", { length: 255 }),
   },
   (table) => ({
-    contactCallTimeIdx: index("calls_contact_call_time_idx").on(
+    contactStartIdx: index("calls_contact_start_idx").on(
       table.contact_id,
-      table.call_time,
+      table.start_at,
     ),
   }),
 );

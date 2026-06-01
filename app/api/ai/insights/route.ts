@@ -3,9 +3,11 @@ import { z } from "zod";
 import { buildContactContext } from "@/lib/ai/build-context";
 import { generateContactInsight } from "@/lib/ai/insights";
 import { createActionable } from "@/db/repository/actionables";
+import { getHubSpotConnectionByOrganizationId } from "@/db/repository";
 import { toActionableData } from "@/lib/actionables";
 import { ensureLocalContactForActionables } from "@/lib/contacts";
 import { getCurrentOrganization } from "@/lib/session";
+import { queueActionSyncTask } from "@/lib/sync-tasks";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     const { insight, prompt, output } = result;
 
-    const actionable = await createActionable({
+    let actionable = await createActionable({
       contact_id: localContact.id,
       organization_id: organization.id,
       prompt,
@@ -89,6 +91,30 @@ export async function POST(request: NextRequest) {
       recommended_channel: output.recommended_channel,
       reasoning: output.reasoning,
     });
+
+    const hubSpotConnection = await getHubSpotConnectionByOrganizationId(
+      organization.id,
+    );
+    const shouldQueueGeneratedActions =
+      !hubSpotConnection ||
+      localContact.source !== "hubspot" ||
+      !localContact.external_id;
+
+    if (shouldQueueGeneratedActions) {
+      const message = !hubSpotConnection
+        ? "HubSpot no está conectado para esta organización."
+        : "El contacto todavía no tiene un ID externo de HubSpot.";
+
+      for (const action of actionable.actions) {
+        actionable =
+          (await queueActionSyncTask({
+            organizationId: organization.id,
+            actionable,
+            action,
+            message,
+          })) ?? actionable;
+      }
+    }
 
     return NextResponse.json(
       { actionable: toActionableData(actionable) },

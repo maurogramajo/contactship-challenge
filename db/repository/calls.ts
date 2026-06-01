@@ -11,7 +11,7 @@ export async function getCallsByContactId(
     .select()
     .from(calls)
     .where(eq(calls.contact_id, contactId))
-    .orderBy(desc(calls.call_time));
+    .orderBy(desc(calls.start_at));
 
   if (limit !== undefined && offset !== undefined) {
     return base.limit(limit).offset(offset);

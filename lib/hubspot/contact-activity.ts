@@ -11,6 +11,15 @@ const HUBSPOT_TASK_PROPERTIES = [
   "hs_task_status",
   "hs_task_priority",
 ];
+const HUBSPOT_MEETING_PROPERTIES = [
+  "hs_meeting_title",
+  "hs_meeting_body",
+  "hs_internal_meeting_notes",
+  "hs_meeting_start_time",
+  "hs_meeting_end_time",
+  "hs_meeting_outcome",
+  "hs_timestamp",
+];
 const MAX_BATCH_SIZE = 100;
 
 export interface HubSpotNoteSummary {
@@ -28,10 +37,21 @@ export interface HubSpotTaskSummary {
   priority: string | null;
 }
 
+export interface HubSpotMeetingSummary {
+  id: string;
+  title: string;
+  body: string;
+  internalNotes: string;
+  startAt: string | null;
+  endAt: string | null;
+  outcome: string | null;
+}
+
 export interface HubSpotContactActivity {
   hasHubSpotContact: boolean;
   notes: HubSpotNoteSummary[];
   tasks: HubSpotTaskSummary[];
+  meetings: HubSpotMeetingSummary[];
   error: string | null;
 }
 
@@ -140,6 +160,43 @@ async function readTasks(client: Client, ids: string[]): Promise<HubSpotTaskSumm
     });
 }
 
+async function readMeetings(
+  client: Client,
+  ids: string[],
+): Promise<HubSpotMeetingSummary[]> {
+  if (ids.length === 0) return [];
+
+  const batches = await Promise.all(
+    chunk(ids, MAX_BATCH_SIZE).map((batch) =>
+      client.crm.objects.meetings.batchApi.read({
+        properties: HUBSPOT_MEETING_PROPERTIES,
+        propertiesWithHistory: [],
+        inputs: batch.map((id) => ({ id })),
+      }),
+    ),
+  );
+
+  return batches
+    .flatMap((batch) => batch.results)
+    .map((item) => ({
+      id: item.id,
+      title: item.properties.hs_meeting_title?.trim() || "Meeting sin titulo",
+      body: stripHtml(item.properties.hs_meeting_body),
+      internalNotes: stripHtml(item.properties.hs_internal_meeting_notes),
+      startAt:
+        toIsoDate(item.properties.hs_meeting_start_time) ??
+        toIsoDate(item.properties.hs_timestamp) ??
+        item.createdAt.toISOString(),
+      endAt: toIsoDate(item.properties.hs_meeting_end_time),
+      outcome: item.properties.hs_meeting_outcome,
+    }))
+    .sort((left, right) => {
+      const leftTime = left.startAt ? new Date(left.startAt).getTime() : 0;
+      const rightTime = right.startAt ? new Date(right.startAt).getTime() : 0;
+      return rightTime - leftTime;
+    });
+}
+
 export async function getHubSpotContactActivity(
   contactIdentifier: string,
   organizationId: string,
@@ -150,6 +207,7 @@ export async function getHubSpotContactActivity(
       hasHubSpotContact: false,
       notes: [],
       tasks: [],
+      meetings: [],
       error: null,
     };
   }
@@ -164,6 +222,7 @@ export async function getHubSpotContactActivity(
       hasHubSpotContact: false,
       notes: [],
       tasks: [],
+      meetings: [],
       error: null,
     };
   }
@@ -174,20 +233,23 @@ export async function getHubSpotContactActivity(
       externalId,
       [],
       [],
-      ["notes", "tasks"],
+      ["notes", "tasks", "meetings"],
     );
 
     const noteIds = getAssociationIds(contact.associations, "notes");
     const taskIds = getAssociationIds(contact.associations, "tasks");
-    const [notes, tasks] = await Promise.all([
+    const meetingIds = getAssociationIds(contact.associations, "meetings");
+    const [notes, tasks, meetings] = await Promise.all([
       readNotes(client, noteIds),
       readTasks(client, taskIds),
+      readMeetings(client, meetingIds),
     ]);
 
     return {
       hasHubSpotContact: true,
       notes,
       tasks,
+      meetings,
       error: null,
     };
   } catch (error) {
@@ -195,6 +257,7 @@ export async function getHubSpotContactActivity(
       hasHubSpotContact: true,
       notes: [],
       tasks: [],
+      meetings: [],
       error: formatHubSpotError(error),
     };
   }

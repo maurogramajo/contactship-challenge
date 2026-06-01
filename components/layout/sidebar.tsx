@@ -76,6 +76,26 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+  {
+    label: "Test",
+    href: "/dashboard/test",
+    icon: (
+      <svg
+        className="h-5 w-5"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+        strokeWidth={1.5}
+        stroke="currentColor"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M9.75 3.75h4.5m-3 0v4.5l-5.1 8.84A2.25 2.25 0 0 0 8.1 20.25h7.8a2.25 2.25 0 0 0 1.95-3.16l-5.1-8.84v-4.5"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar() {

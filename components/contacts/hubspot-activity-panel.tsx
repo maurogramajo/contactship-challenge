@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import type {
+  HubSpotMeetingSummary,
   HubSpotNoteSummary,
   HubSpotTaskSummary,
 } from "@/lib/hubspot/contact-activity";
@@ -12,10 +13,11 @@ interface HubSpotActivityPanelProps {
   hasHubSpotContact: boolean;
   notes: HubSpotNoteSummary[];
   tasks: HubSpotTaskSummary[];
+  meetings: HubSpotMeetingSummary[];
   error: string | null;
 }
 
-type ActivityTab = "notes" | "tasks";
+type ActivityTab = "notes" | "tasks" | "meetings";
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "Sin fecha";
@@ -66,6 +68,7 @@ export function HubSpotActivityPanel({
   hasHubSpotContact,
   notes,
   tasks,
+  meetings,
   error,
 }: HubSpotActivityPanelProps) {
   const [activeTab, setActiveTab] = useState<ActivityTab>("notes");
@@ -78,10 +81,10 @@ export function HubSpotActivityPanel({
             Actividad
           </p>
           <h2 className="mt-1 text-lg font-semibold text-text-primary">
-            Notas y tareas de HubSpot
+            Actividad de HubSpot
           </h2>
           <p className="mt-1 text-sm text-text-secondary">
-            Se consultan directamente sobre el contacto vinculado en HubSpot.
+            Notas, tareas y meetings consultados sobre el contacto vinculado.
           </p>
         </div>
 
@@ -95,6 +98,11 @@ export function HubSpotActivityPanel({
             active={activeTab === "tasks"}
             label={`Tareas (${tasks.length})`}
             onClick={() => setActiveTab("tasks")}
+          />
+          <TabButton
+            active={activeTab === "meetings"}
+            label={`Meetings (${meetings.length})`}
+            onClick={() => setActiveTab("meetings")}
           />
         </div>
       </div>
@@ -138,7 +146,7 @@ export function HubSpotActivityPanel({
             ))
           )}
         </ActivityList>
-      ) : (
+      ) : activeTab === "tasks" ? (
         <ActivityList>
           {tasks.length === 0 ? (
             <EmptyState
@@ -175,6 +183,51 @@ export function HubSpotActivityPanel({
                     {task.body}
                   </p>
                 )}
+              </article>
+            ))
+          )}
+        </ActivityList>
+      ) : (
+        <ActivityList>
+          {meetings.length === 0 ? (
+            <EmptyState
+              title="No hay meetings asociados"
+              description="HubSpot no devolvió meetings para este contacto."
+            />
+          ) : (
+            meetings.map((meeting) => (
+              <article
+                key={meeting.id}
+                className="rounded-xl border border-border-light bg-surface-secondary p-4"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="hubspot">Meeting</Badge>
+                      {meeting.outcome ? (
+                        <Badge variant="info">{meeting.outcome}</Badge>
+                      ) : null}
+                    </div>
+                    <h3 className="mt-3 text-sm font-semibold text-text-primary">
+                      {meeting.title}
+                    </h3>
+                  </div>
+
+                  <time className="text-xs text-text-tertiary">
+                    {formatDate(meeting.startAt)}
+                  </time>
+                </div>
+
+                {meeting.body || meeting.internalNotes ? (
+                  <div className="mt-3 space-y-3 text-sm leading-6 text-text-secondary">
+                    {meeting.body ? (
+                      <p className="whitespace-pre-wrap">{meeting.body}</p>
+                    ) : null}
+                    {meeting.internalNotes ? (
+                      <p className="whitespace-pre-wrap">{meeting.internalNotes}</p>
+                    ) : null}
+                  </div>
+                ) : null}
               </article>
             ))
           )}

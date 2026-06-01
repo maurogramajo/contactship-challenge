@@ -2,10 +2,10 @@ import {
   getContactById,
   getCallsByContactId,
   getCommentsByContactId,
-  getTagsByContactId,
 } from "@/db/repository";
 import { getAiSettings } from "@/db/repository/organization-ai-settings";
 import { getActionablesByContactId } from "@/db/repository/actionables";
+import { getHubSpotContactActivity } from "@/lib/hubspot/contact-activity";
 import type { InsightContext } from "./insights";
 
 export async function buildContactContext(
@@ -20,7 +20,7 @@ export async function buildContactContext(
     getContactById(contactId, organizationId),
     getCallsByContactId(contactId),
     getCommentsByContactId(contactId),
-    getTagsByContactId(contactId),
+    getHubSpotContactActivity(contactId, organizationId),
   ];
 
   const orgSettingsPromise =
@@ -34,21 +34,17 @@ export async function buildContactContext(
 
   fetchers.push(orgSettingsPromise, previousActionablesPromise);
 
-  const [contact, calls, comments, tags, orgSettings, previousActionables] =
+  const [contact, calls, comments, hubspotActivity, orgSettings, previousActionables] =
     await Promise.all(fetchers) as [
       Awaited<ReturnType<typeof getContactById>>,
       Awaited<ReturnType<typeof getCallsByContactId>>,
       Awaited<ReturnType<typeof getCommentsByContactId>>,
-      Awaited<ReturnType<typeof getTagsByContactId>>,
+      Awaited<ReturnType<typeof getHubSpotContactActivity>>,
       Awaited<ReturnType<typeof getAiSettings>>,
       Awaited<ReturnType<typeof getActionablesByContactId>>,
     ];
 
   if (!contact) return null;
-
-  const inboundCalls = calls.filter((c) => c.direction === "inbound");
-  const outboundCalls = calls.filter((c) => c.direction === "outbound");
-  const answeredCalls = calls.filter((c) => c.status === "answered");
 
   const context: InsightContext = {
     contact: {
@@ -60,19 +56,50 @@ export async function buildContactContext(
       description: contact.description,
     },
     calls: {
-      total: calls.length,
-      lastDate: calls[0]?.call_time?.toISOString() ?? null,
-      inboundCount: inboundCalls.length,
-      outboundCount: outboundCalls.length,
-      answeredRate:
-        calls.length > 0 ? answeredCalls.length / calls.length : 0,
+      items: calls.slice(0, 6).map((call) => ({
+        direction: call.direction,
+        from: call.from,
+        call_status: call.call_status,
+        call_result: call.call_result,
+        disconnection_reason: call.disconnection_reason,
+        start_at: call.start_at?.toISOString() ?? null,
+        finished_at: call.finished_at?.toISOString() ?? null,
+        duration: call.duration,
+        analysis_summary: call.call_analysis?.summary ?? null,
+        analysis_sentiment: call.call_analysis?.sentiment ?? null,
+        chat_history: call.chat_history?.slice(0, 12) ?? [],
+      })),
     },
     comments: {
-      count: comments.length,
-      lastDate: comments[0]?.created_at?.toISOString() ?? null,
-      lastContent: comments[0]?.content ?? null,
+      items: comments.slice(0, 8).map((comment) => ({
+        updated_at: comment.updated_at?.toISOString() ?? null,
+        created_at: comment.created_at?.toISOString() ?? null,
+        content: comment.content,
+        user_name: comment.user_name,
+      })),
     },
-    tags: tags.map((t) => t.name),
+    hubspot: {
+      notes: hubspotActivity.notes.slice(0, 8).map((note) => ({
+        body: note.body,
+        createdAt: note.createdAt,
+      })),
+      tasks: hubspotActivity.tasks.slice(0, 8).map((task) => ({
+        title: task.title,
+        body: task.body,
+        dueAt: task.dueAt,
+        status: task.status,
+        priority: task.priority,
+      })),
+      meetings: hubspotActivity.meetings.slice(0, 8).map((meeting) => ({
+        title: meeting.title,
+        body: meeting.body,
+        internalNotes: meeting.internalNotes,
+        startAt: meeting.startAt,
+        endAt: meeting.endAt,
+        outcome: meeting.outcome,
+      })),
+      error: hubspotActivity.error,
+    },
   };
 
   if (orgSettings) {

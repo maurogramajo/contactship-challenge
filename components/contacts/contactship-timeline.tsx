@@ -59,17 +59,16 @@ export function ContactshipTimeline({ events }: ContactshipTimelineProps) {
               Interacciones ContactShip
             </h2>
           </div>
-          <Badge variant="tag">Simulado</Badge>
         </div>
         <p className="mt-2 text-sm text-text-secondary">
-          Llamadas, mensajes e interacciones generadas para mostrar el flujo operativo.
+          Llamadas y comentarios registrados para el contacto.
         </p>
       </div>
 
       {events.length === 0 ? (
         <EmptyState
           title="Sin eventos en la timeline"
-          description="Todavía no hay interacciones simuladas para este contacto."
+          description="Todavía no hay llamadas ni comentarios para este contacto."
         />
       ) : (
         <ol className="mt-6 space-y-5">

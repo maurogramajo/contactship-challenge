@@ -29,6 +29,7 @@ export { createHubSpotNote, HubSpotNotesError } from "./notes";
 export {
   getHubSpotContactActivity,
   type HubSpotContactActivity,
+  type HubSpotMeetingSummary,
   type HubSpotNoteSummary,
   type HubSpotTaskSummary,
 } from "./contact-activity";

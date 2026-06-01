@@ -2,7 +2,6 @@ import { relations } from "drizzle-orm";
 import { contacts } from "./contacts";
 import { calls } from "./calls";
 import { comments } from "./comments";
-import { tags, contactTags } from "./tags";
 import { contactActionables } from "./contact-actionables";
 import { syncTasks } from "./sync-tasks";
 import { organizations } from "./organizations";
@@ -17,7 +16,6 @@ export const contactsRelations = relations(contacts, ({ many }) => ({
   comments: many(comments),
   actionables: many(contactActionables),
   syncTasks: many(syncTasks),
-  contactTags: many(contactTags),
 }));
 
 // ── Calls ─────────────────────────────────────────────────────────────────
@@ -61,25 +59,6 @@ export const syncTasksRelations = relations(syncTasks, ({ one }) => ({
   actionable: one(contactActionables, {
     fields: [syncTasks.actionable_id],
     references: [contactActionables.id],
-  }),
-}));
-
-// ── Tags ──────────────────────────────────────────────────────────────────
-
-export const tagsRelations = relations(tags, ({ many }) => ({
-  contactTags: many(contactTags),
-}));
-
-// ── Contact Tags (junction) ───────────────────────────────────────────────
-
-export const contactTagsRelations = relations(contactTags, ({ one }) => ({
-  contact: one(contacts, {
-    fields: [contactTags.contact_id],
-    references: [contacts.id],
-  }),
-  tag: one(tags, {
-    fields: [contactTags.tag_id],
-    references: [tags.id],
   }),
 }));
 
@@ -132,7 +111,6 @@ export const organizationAiSettingsRelations = relations(
 export { contacts } from "./contacts";
 export { calls } from "./calls";
 export { comments } from "./comments";
-export { tags, contactTags } from "./tags";
 export { contactActionables } from "./contact-actionables";
 export { syncTasks } from "./sync-tasks";
 export { organizations } from "./organizations";
@@ -143,7 +121,6 @@ export { organizationAiSettings } from "./organization-ai-settings";
 export type { Contact, NewContact } from "./contacts";
 export type { Call, NewCall } from "./calls";
 export type { Comment, NewComment } from "./comments";
-export type { Tag, NewTag, ContactTag, NewContactTag } from "./tags";
 export type { Organization, NewOrganization } from "./organizations";
 export type {
   OrganizationRefreshToken,
@@ -163,4 +140,4 @@ export type {
 } from "./contact-actionables";
 export type { SyncTask, NewSyncTask } from "./sync-tasks";
 export { sourceEnum } from "./contacts";
-export { directionEnum, statusEnum } from "./calls";
+export { directionEnum } from "./calls";
