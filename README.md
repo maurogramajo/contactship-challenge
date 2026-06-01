@@ -158,13 +158,23 @@ En lugar de un token estático global, cada organización autentica su propia cu
 
 La búsqueda de contactos del challenge es deliberadamente simple: combina un término libre (`search`) con filtros explícitos de `lifecycle_stage` y `lead_status`. La consulta se resuelve contra la base local y, cuando corresponde, contra HubSpot, sin traducción intermedia por LLM. Para este alcance prioricé una experiencia predecible, fácil de auditar y consistente con el tiempo disponible del challenge.
 
+Con HubSpot conectado, el listado es **HubSpot-first**: la API pide una página remota acotada (`limit` por defecto: 30), enriquece esos contactos con la proyección local existente por `external_id`, y agrega como overlay los contactos locales sin `external_id` que todavía están pendientes de sincronización. La app no descarga todo HubSpot para paginar en memoria; usa cursor remoto (`after` / `nextAfter`) y acepta que el `total` global combinado sea aproximado cuando la fuente principal es HubSpot.
+
+La búsqueda por teléfono en el listado es exploratoria. Si el término parece un teléfono parcial, se usa HubSpot Search con filtros `CONTAINS_TOKEN` sobre `phone` y `mobilephone` con variantes normalizadas/sufijos, porque el `query` genérico de HubSpot no encuentra de forma confiable substrings como `58590707`. Esto no cambia la política de deduplicación: para evitar duplicados, el email sigue siendo el identificador fuerte y el teléfono se compara por exactitud normalizada como fallback.
+
 ### 5. Insights on-demand, no automáticos
 
 Los insights de IA se generan únicamente cuando el usuario hace clic en "Analizar contacto". No hay generación en lote ni en background. Esto le da al usuario control sobre cuándo y para qué contactos gasta créditos de API, mantiene los costos predecibles, y evita procesar datos que quizás nunca se consulten. El contexto que recibe el LLM incluye perfil del contacto, estadísticas de llamadas (total, respondidas, perdidas), últimos comentarios, y etiquetas.
 
-### 6. Sincronización unidireccional (HubSpot → ContactShip)
+### 6. Integración híbrida con HubSpot
 
-Para el alcance de esta demo, los contactos se sincronizan de HubSpot hacia ContactShip, no en ambas direcciones. Esto simplifica la lógica de conflictos, evita loops de actualización, y mantiene el modelo de datos predecible. Cada contacto sincronizado guarda `external_id` y `source: "hubspot"` para trazabilidad. La sincronización inversa (ContactShip → HubSpot) queda como mejora futura.
+La integración no es puramente unidireccional ni completamente bidireccional. Hoy el alcance real es este:
+
+- **HubSpot → ContactShip**: se pueden listar y leer contactos de HubSpot desde la UI unificada, materializar contactos remotos en la base local y procesar webhooks de `contact.creation` para upsert local.
+- **ContactShip → HubSpot**: se pueden crear contactos en HubSpot a partir de altas locales y ejecutar acciones concretas sobre contactos remotos (crear notas, tareas y meetings), tanto en línea como por cola de sincronización.
+- **Lo que todavía no existe**: no hay sincronización general de updates de contacto campo por campo desde ContactShip hacia HubSpot, no hay resolución formal de conflictos, y los webhooks entrantes todavía cubren un subconjunto acotado de eventos.
+
+En otras palabras, la app ya escribe en HubSpot, pero no ofrece una sincronización bidireccional completa del modelo de contactos. Cada contacto sincronizado guarda `external_id` y `source: "hubspot"` para trazabilidad.
 
 ### 7. API REST con server components
 
@@ -172,7 +182,7 @@ Las rutas de la App Router (`app/api/`) exponen una API REST consumida tanto por
 
 ## Mejoras futuras
 
-1. **Sincronización bidireccional**: permitir que cambios hechos en ContactShip (nuevos comentarios, actualización de datos) se reflejen en HubSpot, con detección y resolución de conflictos cuando el mismo campo se modifica en ambos lados.
+1. **Sincronización bidireccional completa**: extender la integración actual para que cambios generales hechos en ContactShip (actualización de datos del contacto, comentarios u otros eventos relevantes) se reflejen en HubSpot con reglas explícitas de ownership y propagación.
 
 2. **Resolución de conflictos**: cuando un contacto se modifica tanto en HubSpot como en ContactShip entre sincronizaciones, implementar una estrategia de merge (last-write-wins con registro de auditoría, o merge campo por campo con intervención manual).
 

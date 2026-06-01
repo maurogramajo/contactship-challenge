@@ -57,6 +57,10 @@ export const syncTasks = pgTable(
       .notNull(),
   },
   (table) => ({
+    statusCreatedIdx: index("sync_tasks_status_created_idx").on(
+      table.status,
+      table.created_at,
+    ),
     organizationStatusCreatedIdx: index("sync_tasks_org_status_created_idx").on(
       table.organization_id,
       table.status,

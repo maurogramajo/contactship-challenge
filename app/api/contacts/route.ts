@@ -10,7 +10,8 @@ import { getCurrentOrganization } from "@/lib/session";
 
 const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
+  after: z.string().optional(),
   search: z.string().optional(),
   source: z.enum(["hubspot"]).optional(),
   lifecycle_stage: z.string().optional(),
@@ -40,12 +41,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { page, limit, search, source, lifecycle_stage, lead_status } = parsed.data;
+    const { page, limit, after, search, source, lifecycle_stage, lead_status } =
+      parsed.data;
 
     const result = await getUnifiedContacts({
       organizationId: organization.id,
       page,
       limit,
+      after,
       search,
       source,
       lifecycleStage: lifecycle_stage,

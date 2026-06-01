@@ -17,6 +17,7 @@ export interface GetContactsFilters {
   organizationId: string;
   page?: number;
   limit?: number;
+  after?: string;
   search?: string;
   source?: "hubspot";
   sort?: "created_at" | "full_name" | "email";
@@ -30,6 +31,9 @@ export interface PaginatedResponse {
   total: number;
   page: number;
   totalPages: number;
+  hasNextPage?: boolean;
+  nextAfter?: string;
+  totalIsApproximate?: boolean;
 }
 
 function buildContactsWhereClause(filters: GetContactsFilters): SQL | undefined {
@@ -70,7 +74,7 @@ export async function getContacts(
   filters: GetContactsFilters,
 ): Promise<PaginatedResponse> {
   const page = filters.page ?? 1;
-  const limit = filters.limit ?? 20;
+  const limit = filters.limit ?? 30;
   const offset = (page - 1) * limit;
   const whereClause = buildContactsWhereClause(filters);
   const listQuery = db
@@ -155,6 +159,52 @@ export async function getContactByPhoneNumber(
   return result[0] ?? null;
 }
 
+export async function getContactByNormalizedEmail(
+  email: string,
+  organizationId: string,
+): Promise<Contact | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const result = await db
+    .select()
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.organization_id, organizationId),
+        sql`lower(trim(${contacts.email})) = ${normalizedEmail}`,
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
+export async function getContactByNormalizedPhoneNumber(
+  phoneNumber: string,
+  organizationId: string,
+): Promise<Contact | null> {
+  const normalizedPhoneNumber = phoneNumber.replace(/\D/g, "");
+  if (!normalizedPhoneNumber) {
+    return null;
+  }
+
+  const result = await db
+    .select()
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.organization_id, organizationId),
+        sql`regexp_replace(coalesce(${contacts.phone_number}, ''), '[^0-9]+', '', 'g') = ${normalizedPhoneNumber}`,
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
 export async function createContact(
   data: NewContact
 ): Promise<Contact> {
@@ -206,17 +256,25 @@ export async function upsertContactByExternalId(
 
 export async function getContactsWithoutExternalIds(
   organizationId: string,
+  options: Pick<
+    GetContactsFilters,
+    "limit" | "search" | "lifecycleStage" | "leadStatus"
+  > = {},
 ): Promise<Contact[]> {
+  const whereClause = buildContactsWhereClause({
+    organizationId,
+    search: options.search,
+    lifecycleStage: options.lifecycleStage,
+    leadStatus: options.leadStatus,
+    extraConditions: [isNull(contacts.external_id)],
+  });
+
   return db
     .select()
     .from(contacts)
-    .where(
-      and(
-        eq(contacts.organization_id, organizationId),
-        isNull(contacts.external_id),
-      ),
-    )
-    .orderBy(desc(contacts.created_at));
+    .where(whereClause)
+    .orderBy(desc(contacts.created_at))
+    .limit(options.limit ?? 30);
 }
 
 export async function getContactsByExternalIds(

@@ -1,12 +1,17 @@
 export { createHubSpotClient, getHubSpotClientForOrganization, sleep } from "./client";
 export {
   getHubSpotContacts,
+  getHubSpotContactsPage,
   getAllHubSpotContacts,
   searchHubSpotContacts,
+  searchHubSpotContactsPage,
   searchAllHubSpotContacts,
+  buildHubSpotPhoneSearchTokens,
+  isPhoneLikeHubSpotSearch,
   getHubSpotContactById,
   createHubSpotContact,
   mapHubSpotContactToOurModel,
+  type HubSpotContactPage,
   type HubSpotContact,
 } from "./contacts";
 export { testConnection } from "./test-connection";

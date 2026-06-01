@@ -24,6 +24,8 @@ interface TableProps<T> {
   pagination?: {
     page: number;
     totalPages: number;
+    hasNextPage?: boolean;
+    totalIsApproximate?: boolean;
     onPageChange: (page: number) => void;
   };
   /** Loading state — renders skeleton rows */
@@ -131,10 +133,15 @@ export function Table<T extends Record<string, unknown>>({
       </div>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
+      {pagination &&
+        (pagination.totalPages > 1 ||
+          pagination.hasNextPage ||
+          pagination.page > 1) && (
         <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/70 px-5 py-4">
           <p className="text-sm font-medium text-slate-600">
-            Página {pagination.page} de {pagination.totalPages}
+            {pagination.totalIsApproximate
+              ? `Página ${pagination.page}`
+              : `Página ${pagination.page} de ${pagination.totalPages}`}
           </p>
           <div className="flex gap-1">
             <button
@@ -148,7 +155,11 @@ export function Table<T extends Record<string, unknown>>({
             <button
               type="button"
               onClick={() => pagination.onPageChange(pagination.page + 1)}
-              disabled={pagination.page >= pagination.totalPages}
+              disabled={
+                pagination.hasNextPage === undefined
+                  ? pagination.page >= pagination.totalPages
+                  : !pagination.hasNextPage
+              }
               className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Siguiente

@@ -1,4 +1,7 @@
 import type { Client } from "@hubspot/api-client";
+import { FilterOperatorEnum } from "@hubspot/api-client/lib/codegen/crm/contacts/models/Filter";
+import type { Filter } from "@hubspot/api-client/lib/codegen/crm/contacts/models/Filter";
+import type { PublicObjectSearchRequest } from "@hubspot/api-client/lib/codegen/crm/contacts/models/PublicObjectSearchRequest";
 import { getHubSpotClientForOrganization, sleep } from "./client";
 import type { NewContact } from "@/db/schema/contacts";
 import { inferHubSpotLeadClassification } from "@/lib/ai/hubspot-classification";
@@ -29,6 +32,7 @@ const CONTACT_PROPERTIES = [
   "lastname",
   "email",
   "phone",
+  "mobilephone",
   "company",
   "lifecyclestage",
   "hs_lead_status",
@@ -45,6 +49,27 @@ type CreateHubSpotContactInput = {
   lifecycleStage?: string | null;
   leadStatus?: string | null;
 };
+
+type HubSpotContactPageOptions = {
+  limit?: number;
+  after?: string | null;
+  lifecycleStage?: string | null;
+  leadStatus?: string | null;
+};
+
+export type HubSpotContactPage = {
+  results: HubSpotContact[];
+  total?: number;
+  nextAfter?: string;
+};
+
+type HubSpotSearchRequest = PublicObjectSearchRequest & {
+  limit: number;
+  properties: string[];
+  sorts: string[];
+};
+
+type HubSpotSearchFilter = Pick<Filter, "propertyName" | "operator" | "value">;
 
 // ── Retry helper ───────────────────────────────────────────────────────────
 
@@ -107,18 +132,165 @@ export async function searchHubSpotContacts(
   query: string,
   limit = 100,
   after?: string,
+  filters: Pick<HubSpotContactPageOptions, "lifecycleStage" | "leadStatus"> = {},
 ): Promise<HubSpotGetPageResponse> {
   return withRetry(async () => {
-    const response = await client.crm.contacts.searchApi.doSearch({
-      query,
-      limit,
-      after,
-      properties: CONTACT_PROPERTIES,
-      sorts: ["-lastmodifieddate"],
-    });
+    const response = await client.crm.contacts.searchApi.doSearch(
+      buildContactSearchRequest(query, limit, after, filters),
+    );
 
     return response as unknown as HubSpotGetPageResponse;
   });
+}
+
+function clampHubSpotPageLimit(limit: number | undefined): number {
+  if (!Number.isFinite(limit)) return 30;
+  return Math.min(Math.max(Math.trunc(limit ?? 30), 1), 100);
+}
+
+function toHubSpotContactPage(page: HubSpotGetPageResponse): HubSpotContactPage {
+  return {
+    results: page.results,
+    total: page.total,
+    nextAfter: page.paging?.next?.after,
+  };
+}
+
+export function isPhoneLikeHubSpotSearch(query: string): boolean {
+  const trimmed = query.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  return digits.length >= 4 && !/[a-zA-Z@]/.test(trimmed);
+}
+
+export function buildHubSpotPhoneSearchTokens(query: string): string[] {
+  const digits = query.replace(/\D/g, "");
+  if (digits.length < 4) {
+    return [];
+  }
+
+  const candidates = [
+    digits,
+    digits.length > 10 ? digits.slice(-10) : null,
+    digits.length > 8 ? digits.slice(-8) : null,
+  ];
+
+  return Array.from(new Set(candidates.filter(Boolean) as string[]));
+}
+
+function buildPhoneSearchFilterGroups(
+  query: string,
+  baseFilters: HubSpotSearchFilter[],
+): NonNullable<HubSpotSearchRequest["filterGroups"]> {
+  const filters = buildHubSpotPhoneSearchTokens(query).flatMap((token) =>
+    ["phone", "mobilephone"].map((propertyName) => ({
+      filters: [
+        {
+          propertyName,
+          operator: FilterOperatorEnum.ContainsToken,
+          value: `*${token}*`,
+        },
+        ...baseFilters,
+      ],
+    })),
+  );
+
+  return filters.slice(0, 5);
+}
+
+function buildContactSearchRequest(
+  query: string,
+  limit: number,
+  after?: string | null,
+  filters: Pick<HubSpotContactPageOptions, "lifecycleStage" | "leadStatus"> = {},
+): HubSpotSearchRequest {
+  const trimmedQuery = query.trim();
+  const baseFilters = buildHubSpotListBaseFilters(filters);
+  const request: HubSpotSearchRequest = {
+    limit: clampHubSpotPageLimit(limit),
+    properties: CONTACT_PROPERTIES,
+    sorts: ["-lastmodifieddate"],
+  };
+
+  if (after) {
+    request.after = after;
+  }
+
+  if (trimmedQuery && isPhoneLikeHubSpotSearch(trimmedQuery)) {
+    const filterGroups = buildPhoneSearchFilterGroups(trimmedQuery, baseFilters);
+    if (filterGroups.length > 0) {
+      request.filterGroups = filterGroups;
+      return request;
+    }
+  }
+
+  if (trimmedQuery) {
+    request.query = trimmedQuery;
+  }
+
+  if (baseFilters.length > 0) {
+    request.filterGroups = [{ filters: baseFilters }];
+  }
+
+  return request;
+}
+
+function buildHubSpotListBaseFilters(
+  filters: Pick<HubSpotContactPageOptions, "lifecycleStage" | "leadStatus">,
+): HubSpotSearchFilter[] {
+  const baseFilters: HubSpotSearchFilter[] = [];
+
+  if (filters.lifecycleStage) {
+    baseFilters.push({
+      propertyName: "lifecyclestage",
+      operator: FilterOperatorEnum.Eq,
+      value: filters.lifecycleStage,
+    });
+  }
+
+  if (filters.leadStatus) {
+    baseFilters.push({
+      propertyName: "hs_lead_status",
+      operator: FilterOperatorEnum.Eq,
+      value: filters.leadStatus,
+    });
+  }
+
+  return baseFilters;
+}
+
+export async function getHubSpotContactsPage(
+  organizationId: string,
+  options: HubSpotContactPageOptions = {},
+): Promise<HubSpotContactPage> {
+  const client = await getHubSpotClientForOrganization(organizationId);
+  const page = await getHubSpotContacts(
+    client,
+    clampHubSpotPageLimit(options.limit),
+    options.after ?? undefined,
+  );
+
+  return toHubSpotContactPage(page);
+}
+
+export async function searchHubSpotContactsPage(
+  organizationId: string,
+  query: string,
+  options: HubSpotContactPageOptions = {},
+): Promise<HubSpotContactPage> {
+  const client = await getHubSpotClientForOrganization(organizationId);
+  const page = await searchHubSpotContacts(
+    client,
+    query,
+    clampHubSpotPageLimit(options.limit),
+    options.after ?? undefined,
+    {
+      lifecycleStage: options.lifecycleStage,
+      leadStatus: options.leadStatus,
+    },
+  );
+
+  return toHubSpotContactPage(page);
 }
 
 /**
@@ -251,7 +423,7 @@ export function mapHubSpotContactToOurModel(
 
   return {
     full_name: fullName || null,
-    phone_number: p.phone ?? null,
+    phone_number: p.phone ?? p.mobilephone ?? null,
     email: p.email ?? null,
     external_id: hsContact.id,
     source: "hubspot",

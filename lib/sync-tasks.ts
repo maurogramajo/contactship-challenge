@@ -18,8 +18,13 @@ import {
   createHubSpotContact,
   executeHubSpotAction,
   HubSpotActionExecutionError,
+  mapHubSpotContactToOurModel,
 } from "@/lib/hubspot";
 import { testConnection } from "@/lib/hubspot/test-connection";
+import {
+  findHubSpotDuplicateContact,
+  normalizeContactEmail,
+} from "@/lib/contact-deduplication";
 
 const MAX_SYNC_TASK_RETRIES = 5;
 const HUBSPOT_VIRTUAL_ID_PREFIX = "hubspot:";
@@ -314,16 +319,69 @@ async function processCreateContactSyncTask(task: SyncTask) {
   }
 
   try {
+    const email = normalizeContactEmail(
+      getPayloadString(task.payload, "email") ?? contact.email,
+    );
+    const phoneNumber =
+      getPayloadString(task.payload, "phone_number") ?? contact.phone_number;
+    const description =
+      getPayloadString(task.payload, "description") ?? contact.description;
+    const additionalData =
+      (task.payload.additional_data as Contact["additional_data"] | null | undefined) ??
+      contact.additional_data;
+    const duplicateSearch = await findHubSpotDuplicateContact(
+      task.organization_id,
+      {
+        full_name: fullName,
+        email,
+        phone_number: phoneNumber,
+      },
+    );
+
+    if (duplicateSearch.status === "unverified") {
+      const message =
+        duplicateSearch.error instanceof Error
+          ? duplicateSearch.error.message
+          : "No se pudo verificar si el contacto ya existe en HubSpot.";
+      await markContactSyncFailure(task, message);
+      return { status: "failed" as const, reason: message };
+    }
+
+    if (duplicateSearch.status === "match") {
+      const mapped = mapHubSpotContactToOurModel(
+        duplicateSearch.contact,
+        task.organization_id,
+      );
+
+      await updateContact(contact.id, task.organization_id, {
+        full_name: mapped.full_name ?? contact.full_name,
+        email: normalizeContactEmail(mapped.email) ?? email,
+        phone_number: mapped.phone_number ?? contact.phone_number,
+        country: contact.country,
+        description: contact.description ?? mapped.description,
+        additional_data: contact.additional_data,
+        external_lifecycle_stage:
+          mapped.external_lifecycle_stage ?? contact.external_lifecycle_stage,
+        external_lead_status:
+          mapped.external_lead_status ?? contact.external_lead_status,
+        external_id: duplicateSearch.contact.id,
+        source: "hubspot",
+      });
+      await updateSyncTask(task.id, {
+        status: "completed",
+        executed_at: new Date(),
+        last_error: null,
+      });
+
+      return { status: "completed" as const, taskId: task.id };
+    }
+
     const hubSpotContact = await createHubSpotContact(task.organization_id, {
       full_name: fullName,
-      email: getPayloadString(task.payload, "email") ?? contact.email,
-      phone_number:
-        getPayloadString(task.payload, "phone_number") ?? contact.phone_number,
-      description:
-        getPayloadString(task.payload, "description") ?? contact.description,
-      additional_data:
-        (task.payload.additional_data as Contact["additional_data"] | null | undefined) ??
-        contact.additional_data,
+      email,
+      phone_number: phoneNumber,
+      description,
+      additional_data: additionalData,
       lifecycleStage: contact.external_lifecycle_stage,
       leadStatus: contact.external_lead_status,
     });

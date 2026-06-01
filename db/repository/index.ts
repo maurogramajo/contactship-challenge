@@ -3,6 +3,8 @@ export {
   getAllContacts,
   getContactById,
   getContactByExternalId,
+  getContactByNormalizedEmail,
+  getContactByNormalizedPhoneNumber,
   createContact,
   updateContact,
   upsertContactByExternalId,

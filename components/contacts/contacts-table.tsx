@@ -11,6 +11,8 @@ interface PaginatedData {
   total: number;
   page: number;
   totalPages: number;
+  hasNextPage?: boolean;
+  totalIsApproximate?: boolean;
 }
 
 interface ContactsTableProps {
@@ -130,6 +132,8 @@ export function ContactsTable({
           ? {
               page: result.page,
               totalPages: result.totalPages,
+              hasNextPage: result.hasNextPage,
+              totalIsApproximate: result.totalIsApproximate,
               onPageChange,
             }
           : undefined

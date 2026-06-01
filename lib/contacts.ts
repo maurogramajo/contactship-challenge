@@ -1,9 +1,11 @@
 import {
   createContact,
-  getAllContacts,
+  getContactsByExternalIds,
+  getContactsWithoutExternalIds,
   getContactByExternalId,
   getContactById,
-  getContactByPhoneNumber,
+  getContactByNormalizedEmail,
+  getContactByNormalizedPhoneNumber,
   getContacts,
   updateContact,
   upsertContactByExternalId,
@@ -14,16 +16,22 @@ import { getHubSpotConnectionByOrganizationId } from "@/db/repository";
 import type { Contact, NewContact } from "@/db/schema";
 import {
   createHubSpotContact,
-  getAllHubSpotContacts,
+  getHubSpotContactsPage,
   getHubSpotContactById,
   mapHubSpotContactToOurModel,
-  searchAllHubSpotContacts,
+  searchHubSpotContactsPage,
   type HubSpotContact,
 } from "@/lib/hubspot";
 import { queueContactSyncTask } from "@/lib/sync-tasks";
 import { inferHubSpotLeadClassification } from "@/lib/ai/hubspot-classification";
+import {
+  findHubSpotDuplicateContact,
+  normalizeContactEmail,
+  normalizeContactPhone,
+} from "@/lib/contact-deduplication";
 
 const HUBSPOT_VIRTUAL_ID_PREFIX = "hubspot:";
+const DEFAULT_CONTACT_LIST_LIMIT = 30;
 
 export class DuplicateContactError extends Error {
   readonly code = 409;
@@ -118,6 +126,95 @@ function buildSyncedContactData(
   };
 }
 
+function buildInputContactData(
+  organizationId: string,
+  input: CreateUnifiedContactInput,
+  classification: { lifecycleStage: string; leadStatus: string },
+): NewContact {
+  return {
+    organization_id: organizationId,
+    full_name: input.full_name,
+    email: normalizeContactEmail(input.email),
+    phone_number: input.phone_number?.trim() || null,
+    country: input.country ?? null,
+    description: input.description ?? null,
+    additional_data: input.additional_data,
+    external_lifecycle_stage: classification.lifecycleStage,
+    external_lead_status: classification.leadStatus,
+    external_id: null,
+    source: null,
+  };
+}
+
+function buildHubSpotCreateInput(
+  input: CreateUnifiedContactInput,
+  classification: { lifecycleStage: string; leadStatus: string },
+) {
+  return {
+    full_name: input.full_name,
+    email: normalizeContactEmail(input.email),
+    phone_number: input.phone_number?.trim() || null,
+    description: input.description ?? null,
+    additional_data: input.additional_data,
+    lifecycleStage: classification.lifecycleStage,
+    leadStatus: classification.leadStatus,
+  };
+}
+
+async function materializeHubSpotContactFromInput(
+  organizationId: string,
+  hubSpotContact: HubSpotContact,
+  input: CreateUnifiedContactInput,
+  existing?: Contact | null,
+): Promise<Contact> {
+  const mapped = mapHubSpotContactToOurModel(hubSpotContact, organizationId);
+
+  return upsertContactByExternalId({
+    ...buildSyncedContactData(mapped, existing),
+    full_name: mapped.full_name ?? input.full_name,
+    email: normalizeContactEmail(mapped.email) ?? normalizeContactEmail(input.email),
+    phone_number: mapped.phone_number ?? input.phone_number?.trim() ?? null,
+    country: existing?.country ?? input.country ?? null,
+    description: existing?.description ?? input.description ?? mapped.description ?? null,
+    additional_data: existing?.additional_data ?? input.additional_data ?? null,
+  });
+}
+
+async function createLocalContactWithPendingSync(params: {
+  organizationId: string;
+  input: CreateUnifiedContactInput;
+  classification: { lifecycleStage: string; leadStatus: string };
+  message: string;
+}): Promise<CreateUnifiedContactResult> {
+  const contact = await createContact(
+    buildInputContactData(
+      params.organizationId,
+      params.input,
+      params.classification,
+    ),
+  );
+
+  await queueContactSyncTask({
+    organizationId: params.organizationId,
+    contact,
+    input: {
+      full_name: params.input.full_name,
+      email: normalizeContactEmail(params.input.email),
+      phone_number: params.input.phone_number?.trim() || null,
+      country: params.input.country ?? null,
+      description: params.input.description ?? null,
+      additional_data: params.input.additional_data,
+    },
+    message: params.message,
+  });
+
+  return {
+    contact,
+    syncPending: true,
+    message: "El contacto se guardó localmente y quedó pendiente de sincronización con HubSpot.",
+  };
+}
+
 function mapHubSpotContactToUnifiedContact(
   hubSpotContact: HubSpotContact,
   organizationId: string,
@@ -146,15 +243,32 @@ function mapHubSpotContactToUnifiedContact(
   };
 }
 
-async function getHubSpotContactsForList(
+async function getHubSpotContactsPageForList(
   organizationId: string,
-  search?: string,
-): Promise<HubSpotContact[]> {
-  if (search?.trim()) {
-    return searchAllHubSpotContacts(organizationId, search.trim());
+  options: {
+    search?: string;
+    limit: number;
+    after?: string;
+    lifecycleStage?: string;
+    leadStatus?: string;
+  },
+) {
+  const after = options.after?.trim() || undefined;
+  const hasHubSpotFilters = Boolean(options.lifecycleStage || options.leadStatus);
+
+  if (options.search?.trim() || hasHubSpotFilters) {
+    return searchHubSpotContactsPage(organizationId, options.search?.trim() ?? "", {
+      limit: options.limit,
+      after,
+      lifecycleStage: options.lifecycleStage,
+      leadStatus: options.leadStatus,
+    });
   }
 
-  return getAllHubSpotContacts(organizationId);
+  return getHubSpotContactsPage(organizationId, {
+    limit: options.limit,
+    after,
+  });
 }
 
 export function toHubSpotVirtualContactId(externalId: string): string {
@@ -212,26 +326,27 @@ export async function getUnifiedContacts(
   }
 
   const page = filters.page ?? 1;
-  const limit = filters.limit ?? 20;
-  const offset = (page - 1) * limit;
+  const limit = filters.limit ?? DEFAULT_CONTACT_LIST_LIMIT;
+  const hubSpotPage = await getHubSpotContactsPageForList(filters.organizationId, {
+    search: filters.search,
+    limit,
+    after: filters.after,
+    lifecycleStage: filters.lifecycleStage,
+    leadStatus: filters.leadStatus,
+  });
+  const hubSpotExternalIds = hubSpotPage.results.map((contact) => contact.id);
 
-  const [localContacts, materializedHubSpotContacts, hubSpotContacts] =
-    await Promise.all([
-      getAllContacts({
-        organizationId: filters.organizationId,
-        search: filters.search,
-        extraConditions: filters.extraConditions,
-        lifecycleStage: filters.lifecycleStage,
-        leadStatus: filters.leadStatus,
-      }),
-      getAllContacts({
-        organizationId: filters.organizationId,
-        source: "hubspot",
-        lifecycleStage: filters.lifecycleStage,
-        leadStatus: filters.leadStatus,
-      }),
-      getHubSpotContactsForList(filters.organizationId, filters.search),
-    ]);
+  const [materializedHubSpotContacts, pendingLocalContacts] = await Promise.all([
+    getContactsByExternalIds(hubSpotExternalIds, filters.organizationId),
+    filters.source === "hubspot" || filters.after || page > 1
+      ? Promise.resolve([])
+      : getContactsWithoutExternalIds(filters.organizationId, {
+          limit,
+          search: filters.search,
+          lifecycleStage: filters.lifecycleStage,
+          leadStatus: filters.leadStatus,
+        }),
+  ]);
 
   const materializedHubSpotByExternalId = new Map(
     materializedHubSpotContacts
@@ -239,12 +354,7 @@ export async function getUnifiedContacts(
       .map((contact) => [contact.external_id as string, contact]),
   );
 
-  const localOnlyContacts =
-    filters.source === "hubspot"
-      ? []
-      : localContacts.filter((contact) => contact.source !== "hubspot");
-
-  let hubSpotUnifiedContacts = hubSpotContacts.map((hubSpotContact) =>
+  const hubSpotUnifiedContacts = hubSpotPage.results.map((hubSpotContact) =>
     mapHubSpotContactToUnifiedContact(
       hubSpotContact,
       filters.organizationId,
@@ -252,29 +362,23 @@ export async function getUnifiedContacts(
     ),
   );
 
-  // Apply lifecycle/lead filters in-memory for HubSpot API contacts (not in local DB)
-  if (filters.lifecycleStage) {
-    hubSpotUnifiedContacts = hubSpotUnifiedContacts.filter(
-      (c) => c.external_lifecycle_stage === filters.lifecycleStage,
-    );
-  }
-  if (filters.leadStatus) {
-    hubSpotUnifiedContacts = hubSpotUnifiedContacts.filter(
-      (c) => c.external_lead_status === filters.leadStatus,
-    );
-  }
-
-  const mergedContacts = [...localOnlyContacts, ...hubSpotUnifiedContacts].sort(
+  const mergedContacts = [...pendingLocalContacts, ...hubSpotUnifiedContacts].sort(
     (a, b) => getContactSortTime(b) - getContactSortTime(a),
   );
-
-  const data = mergedContacts.slice(offset, offset + limit);
+  const total = (hubSpotPage.total ?? hubSpotUnifiedContacts.length) +
+    pendingLocalContacts.length;
+  const hasNextPage = Boolean(hubSpotPage.nextAfter);
 
   return {
-    data,
-    total: mergedContacts.length,
+    data: mergedContacts,
+    total,
     page,
-    totalPages: Math.ceil(mergedContacts.length / limit),
+    totalPages: hasNextPage
+      ? Math.max(page + 1, Math.ceil(total / limit))
+      : Math.max(1, Math.ceil(total / limit)),
+    hasNextPage,
+    nextAfter: hubSpotPage.nextAfter,
+    totalIsApproximate: hubSpotPage.total === undefined,
   };
 }
 
@@ -377,33 +481,25 @@ export async function createUnifiedContact(
   input: CreateUnifiedContactInput,
 ): Promise<CreateUnifiedContactResult> {
   const connection = await getHubSpotConnectionByOrganizationId(organizationId);
+  const normalizedEmail = normalizeContactEmail(input.email);
+  const normalizedPhone = normalizeContactPhone(input.phone_number);
 
-  if (input.phone_number) {
-    const existing = await getContactByPhoneNumber(input.phone_number, organizationId);
+  if (normalizedEmail) {
+    const existing = await getContactByNormalizedEmail(
+      normalizedEmail,
+      organizationId,
+    );
+    if (existing) {
+      throw new DuplicateContactError("Ya existe un contacto con ese email");
+    }
+  } else if (normalizedPhone) {
+    const existing = await getContactByNormalizedPhoneNumber(
+      normalizedPhone,
+      organizationId,
+    );
+
     if (existing) {
       throw new DuplicateContactError();
-    }
-
-    if (connection) {
-      try {
-        const hubSpotMatches = await searchAllHubSpotContacts(
-          organizationId,
-          input.phone_number,
-        );
-        const duplicateInHubSpot = hubSpotMatches.some(
-          (contact) => contact.properties.phone?.trim() === input.phone_number,
-        );
-
-        if (duplicateInHubSpot) {
-          throw new DuplicateContactError(
-            "Ya existe un contacto en HubSpot con ese telefono",
-          );
-        }
-      } catch (error) {
-        if (error instanceof DuplicateContactError) {
-          throw error;
-        }
-      }
     }
   }
 
@@ -414,63 +510,57 @@ export async function createUnifiedContact(
   });
 
   if (!connection) {
-    const contact = await createContact({
-      organization_id: organizationId,
-      full_name: input.full_name,
-      email: input.email ?? null,
-      phone_number: input.phone_number ?? null,
-      country: input.country ?? null,
-      description: input.description ?? null,
-      additional_data: input.additional_data,
-      external_lifecycle_stage: classification.lifecycleStage,
-      external_lead_status: classification.leadStatus,
-      external_id: null,
-      source: null,
-    });
-
-    await queueContactSyncTask({
+    return createLocalContactWithPendingSync({
       organizationId,
-      contact,
-      input: {
-        full_name: input.full_name,
-        email: input.email ?? null,
-        phone_number: input.phone_number ?? null,
-        country: input.country ?? null,
-        description: input.description ?? null,
-        additional_data: input.additional_data,
-      },
+      input,
+      classification,
       message: "HubSpot no está conectado para esta organización.",
     });
+  }
+
+  const duplicateSearch = await findHubSpotDuplicateContact(
+    organizationId,
+    input,
+  );
+
+  if (duplicateSearch.status === "match") {
+    const contact = await materializeHubSpotContactFromInput(
+      organizationId,
+      duplicateSearch.contact,
+      input,
+    );
 
     return {
       contact,
-      syncPending: true,
-      message:
-        "El contacto se guardó localmente y quedó pendiente de sincronización con HubSpot.",
+      syncPending: false,
+      message: "El contacto ya existía en HubSpot y quedó vinculado localmente.",
     };
   }
 
-  try {
-    const hubSpotContact = await createHubSpotContact(organizationId, {
-      full_name: input.full_name,
-      email: input.email ?? null,
-      phone_number: input.phone_number ?? null,
-      description: input.description ?? null,
-      additional_data: input.additional_data,
-      lifecycleStage: classification.lifecycleStage,
-      leadStatus: classification.leadStatus,
-    });
-    const mapped = mapHubSpotContactToOurModel(hubSpotContact, organizationId);
+  if (duplicateSearch.status === "unverified") {
+    const message =
+      duplicateSearch.error instanceof Error
+        ? duplicateSearch.error.message
+        : "No se pudo verificar si el contacto ya existe en HubSpot.";
 
-    const contact = await upsertContactByExternalId({
-      ...buildSyncedContactData(mapped),
-      full_name: mapped.full_name ?? input.full_name,
-      email: mapped.email ?? input.email ?? null,
-      phone_number: mapped.phone_number ?? input.phone_number ?? null,
-      country: input.country ?? null,
-      description: input.description ?? mapped.description ?? null,
-      additional_data: input.additional_data,
+    return createLocalContactWithPendingSync({
+      organizationId,
+      input,
+      classification,
+      message,
     });
+  }
+
+  try {
+    const hubSpotContact = await createHubSpotContact(
+      organizationId,
+      buildHubSpotCreateInput(input, classification),
+    );
+    const contact = await materializeHubSpotContactFromInput(
+      organizationId,
+      hubSpotContact,
+      input,
+    );
 
     return { contact, syncPending: false };
   } catch (error) {
@@ -478,43 +568,16 @@ export async function createUnifiedContact(
       throw error;
     }
 
-    const contact = await createContact({
-      organization_id: organizationId,
-      full_name: input.full_name,
-      email: input.email ?? null,
-      phone_number: input.phone_number ?? null,
-      country: input.country ?? null,
-      description: input.description ?? null,
-      additional_data: input.additional_data,
-      external_lifecycle_stage: classification.lifecycleStage,
-      external_lead_status: classification.leadStatus,
-      external_id: null,
-      source: null,
-    });
-
     const message =
       error instanceof Error
         ? error.message
         : "No se pudo crear el contacto en HubSpot.";
 
-    await queueContactSyncTask({
+    return createLocalContactWithPendingSync({
       organizationId,
-      contact,
-      input: {
-        full_name: input.full_name,
-        email: input.email ?? null,
-        phone_number: input.phone_number ?? null,
-        country: input.country ?? null,
-        description: input.description ?? null,
-        additional_data: input.additional_data,
-      },
+      input,
+      classification,
       message,
     });
-
-    return {
-      contact,
-      syncPending: true,
-      message: "El contacto se guardó localmente y quedó pendiente de sincronización con HubSpot.",
-    };
   }
 }

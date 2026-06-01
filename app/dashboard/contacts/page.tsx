@@ -18,6 +18,9 @@ interface PaginatedResponse {
   total: number;
   page: number;
   totalPages: number;
+  hasNextPage?: boolean;
+  nextAfter?: string;
+  totalIsApproximate?: boolean;
 }
 
 interface HubSpotStatusResponse {
@@ -37,7 +40,7 @@ interface CreateContactResponse {
 
 // ── Page size ──────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 30;
 
 // ── Page Component ─────────────────────────────────────────────────────────
 
@@ -54,7 +57,8 @@ export default function ContactsPage() {
   const [search, setSearch] = useState("");
   const [lifecycleStage, setLifecycleStage] = useState("");
   const [leadStatus, setLeadStatus] = useState("");
-  const [, setPage] = useState(1);
+  const [page, setPage] = useState(1);
+  const [cursorByPage, setCursorByPage] = useState<Record<number, string>>({});
 
   // Track fetch for cleanup (abort stale normal-search requests)
   const abortRef = useRef<AbortController | null>(null);
@@ -62,7 +66,13 @@ export default function ContactsPage() {
   // ── Normal search fetch ─────────────────────────────────────────────────
 
   const fetchNormalContacts = useCallback(
-    async (search: string, fetchPage: number, lifecycle?: string, leadStatusFilter?: string) => {
+    async (
+      search: string,
+      fetchPage: number,
+      lifecycle?: string,
+      leadStatusFilter?: string,
+      after?: string,
+    ) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -74,6 +84,9 @@ export default function ContactsPage() {
         const params = new URLSearchParams();
         params.set("page", String(fetchPage));
         params.set("limit", String(PAGE_SIZE));
+        if (after) {
+          params.set("after", after);
+        }
         if (search.trim()) {
           params.set("search", search.trim());
         }
@@ -92,6 +105,12 @@ export default function ContactsPage() {
         if (controller.signal.aborted) return;
 
         setResult(data);
+        if (data.nextAfter) {
+          setCursorByPage((current) => ({
+            ...current,
+            [fetchPage + 1]: data.nextAfter as string,
+          }));
+        }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") return;
         const message =
@@ -112,26 +131,38 @@ export default function ContactsPage() {
   function handleSearchChange(value: string) {
     setSearch(value);
     setPage(1);
+    setCursorByPage({});
     fetchNormalContacts(value, 1, lifecycleStage, leadStatus);
   }
 
   function handleLifecycleStageChange(value: string) {
     setLifecycleStage(value);
     setPage(1);
+    setCursorByPage({});
     fetchNormalContacts(search, 1, value, leadStatus);
   }
 
   function handleLeadStatusChange(value: string) {
     setLeadStatus(value);
     setPage(1);
+    setCursorByPage({});
     fetchNormalContacts(search, 1, lifecycleStage, value);
   }
 
   // ── Pagination ─────────────────────────────────────────────────────────
 
   function handlePageChange(newPage: number) {
+    const isCursorPaginated = Boolean(
+      result?.totalIsApproximate || result?.nextAfter || result?.hasNextPage,
+    );
+    const after = newPage > 1 ? cursorByPage[newPage] : undefined;
+
+    if (isCursorPaginated && newPage > page && !after) {
+      return;
+    }
+
     setPage(newPage);
-    fetchNormalContacts(search, newPage, lifecycleStage, leadStatus);
+    fetchNormalContacts(search, newPage, lifecycleStage, leadStatus, after);
   }
 
   // ── Initial load ───────────────────────────────────────────────────────
@@ -184,6 +215,7 @@ export default function ContactsPage() {
     );
     setSearch("");
     setPage(1);
+    setCursorByPage({});
     void fetchNormalContacts("", 1, lifecycleStage, leadStatus);
   }
 
@@ -207,6 +239,7 @@ export default function ContactsPage() {
             </p>
             <p className="mt-0.5 text-2xl font-semibold leading-none text-slate-950">
               {result && !loading ? result.total : "—"}
+              {result?.totalIsApproximate ? "+" : ""}
             </p>
           </div>
         </div>

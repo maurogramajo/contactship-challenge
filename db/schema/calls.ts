@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   integer,
+  index,
   pgEnum,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -19,21 +20,30 @@ export const statusEnum = pgEnum("call_status", [
   "failed",
 ]);
 
-export const calls = pgTable("calls", {
-  id: uuid("id")
-    .default(sql`gen_random_uuid()`)
-    .primaryKey(),
-  created_at: timestamp("created_at").defaultNow().notNull(),
-  call_time: timestamp("call_time").notNull(),
-  duration: integer("duration"),
-  direction: directionEnum("direction").notNull(),
-  status: statusEnum("status").notNull(),
-  notes: text("notes"),
-  recording_url: varchar("recording_url", { length: 1024 }),
-  contact_id: uuid("contact_id").references(() => contacts.id),
-  user_id: varchar("user_id", { length: 255 }),
-  organization_id: varchar("organization_id", { length: 255 }),
-});
+export const calls = pgTable(
+  "calls",
+  {
+    id: uuid("id")
+      .default(sql`gen_random_uuid()`)
+      .primaryKey(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    call_time: timestamp("call_time").notNull(),
+    duration: integer("duration"),
+    direction: directionEnum("direction").notNull(),
+    status: statusEnum("status").notNull(),
+    notes: text("notes"),
+    recording_url: varchar("recording_url", { length: 1024 }),
+    contact_id: uuid("contact_id").references(() => contacts.id),
+    user_id: varchar("user_id", { length: 255 }),
+    organization_id: varchar("organization_id", { length: 255 }),
+  },
+  (table) => ({
+    contactCallTimeIdx: index("calls_contact_call_time_idx").on(
+      table.contact_id,
+      table.call_time,
+    ),
+  }),
+);
 
 export type Call = typeof calls.$inferSelect;
 export type NewCall = typeof calls.$inferInsert;
