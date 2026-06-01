@@ -2,7 +2,6 @@ import { db } from "@/db";
 import {
   contactActionables,
   type ContactActionable,
-  type NewContactActionable,
 } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
