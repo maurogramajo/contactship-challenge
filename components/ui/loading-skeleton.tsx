@@ -10,7 +10,7 @@ interface LoadingSkeletonProps {
 function SkeletonBar({ width }: { width: string }) {
   return (
     <div
-      className="h-4 animate-pulse rounded-md bg-surface-tertiary"
+      className="h-4 animate-pulse rounded-md bg-slate-200"
       style={{ width }}
     />
   );
@@ -36,13 +36,13 @@ export function LoadingSkeleton({ rows = 5, cols = 1, className = "" }: LoadingS
 
 export function CardSkeleton() {
   return (
-    <div className="rounded-xl border border-border bg-surface p-6 space-y-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
       <SkeletonBar width="40%" />
       <SkeletonBar width="100%" />
       <SkeletonBar width="75%" />
       <div className="flex gap-2 pt-2">
-        <div className="h-6 w-16 animate-pulse rounded-full bg-surface-tertiary" />
-        <div className="h-6 w-20 animate-pulse rounded-full bg-surface-tertiary" />
+        <div className="h-6 w-16 animate-pulse rounded-full bg-slate-200" />
+        <div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
       </div>
     </div>
   );
