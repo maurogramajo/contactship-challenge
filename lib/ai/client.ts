@@ -10,7 +10,7 @@ export function getAiClient(): OpenAI {
   aiClient = new OpenAI({
     baseURL: "https://api.deepseek.com/v1",
     apiKey: process.env.AI_API_KEY!,
-    timeout: 15000,
+    timeout: 30000,
     maxRetries: 1,
   });
 

@@ -81,3 +81,52 @@ export async function updateActionableActions(
   const actionable = result[0];
   return actionable ? normalizeActionableRecord(actionable) : null;
 }
+
+/**
+ * Atomically updates a single action within an actionable's actions array.
+ *
+ * Uses SELECT ... FOR UPDATE inside a transaction to serialize concurrent
+ * updates to the same actionable row. Without this, parallel API calls
+ * modifying different actions on the same actionable suffer a last-write-wins
+ * race condition where the second writer inadvertently reverts the first
+ * writer's status change.
+ */
+export async function updateActionableActionAtomically(
+  actionableId: string,
+  organizationId: string,
+  actionId: string,
+  transformFn: (action: ActionableAction) => ActionableAction,
+): Promise<StoredContactActionable | null> {
+  return db.transaction(async (tx) => {
+    const [record] = await tx
+      .select()
+      .from(contactActionables)
+      .where(
+        and(
+          eq(contactActionables.id, actionableId),
+          eq(contactActionables.organization_id, organizationId),
+        ),
+      )
+      .for("update");
+
+    if (!record) return null;
+
+    const current = normalizeActionableRecord(record);
+    const nextActions = current.actions.map((item) =>
+      item.id === actionId ? transformFn(item) : item,
+    );
+
+    const [updated] = await tx
+      .update(contactActionables)
+      .set({ actions: nextActions })
+      .where(
+        and(
+          eq(contactActionables.id, actionableId),
+          eq(contactActionables.organization_id, organizationId),
+        ),
+      )
+      .returning();
+
+    return updated ? normalizeActionableRecord(updated) : null;
+  });
+}

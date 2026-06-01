@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch, api } from "@/lib/api/client";
 import { Badge } from "@/components/ui/badge";
 
@@ -30,6 +31,7 @@ interface AiSettingsData {
 type AiSaveStatus = "idle" | "saving" | "saved" | "error";
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("idle");
@@ -101,13 +103,14 @@ export default function SettingsPage() {
         scopes: [],
       });
       setConnectionStatus("idle");
+      router.refresh();
     } catch (error) {
       setConnectionStatus("error");
       setErrorMessage(
         error instanceof Error ? error.message : "Error desconocido",
       );
     }
-  }, []);
+  }, [router]);
 
   const handleSaveAiSettings = useCallback(async () => {
     setAiSaveStatus("saving");

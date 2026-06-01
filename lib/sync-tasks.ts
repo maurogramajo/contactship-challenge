@@ -6,6 +6,7 @@ import {
   getHubSpotConnectionByOrganizationId,
   getLatestOpenSyncTaskForResource,
   getOldestPendingSyncTask,
+  updateActionableActionAtomically,
   updateActionableActions,
   updateContact,
   updateSyncTask,
@@ -200,14 +201,11 @@ export async function queueActionSyncTask(params: {
   action: ActionableAction;
   message: string;
 }): Promise<StoredContactActionable> {
-  const nextActions = params.actionable.actions.map((item) =>
-    item.id === params.action.id ? buildPendingAction(item, params.message) : item,
-  );
-
-  const updated = await updateActionableActions(
+  const updated = await updateActionableActionAtomically(
     params.actionable.id,
     params.organizationId,
-    nextActions,
+    params.action.id,
+    (action) => buildPendingAction(action, params.message),
   );
 
   await ensurePendingSyncTask({
@@ -224,7 +222,7 @@ export async function queueActionSyncTask(params: {
     lastError: params.message,
   });
 
-  return updated ?? { ...params.actionable, actions: nextActions };
+  return updated ?? params.actionable;
 }
 
 export async function markActionSyncCompleted(params: {
@@ -233,16 +231,11 @@ export async function markActionSyncCompleted(params: {
   action: ActionableAction;
   externalId: string;
 }): Promise<StoredContactActionable> {
-  const nextActions = params.actionable.actions.map((item) =>
-    item.id === params.action.id
-      ? buildExecutedAction(item, params.externalId)
-      : item,
-  );
-
-  const updated = await updateActionableActions(
+  const updated = await updateActionableActionAtomically(
     params.actionable.id,
     params.organizationId,
-    nextActions,
+    params.action.id,
+    (action) => buildExecutedAction(action, params.externalId),
   );
 
   await completeOpenSyncTasksForResource({
@@ -253,7 +246,7 @@ export async function markActionSyncCompleted(params: {
     type: params.action.type,
   });
 
-  return updated ?? { ...params.actionable, actions: nextActions };
+  return updated ?? params.actionable;
 }
 
 export async function queueContactSyncTask(params: {

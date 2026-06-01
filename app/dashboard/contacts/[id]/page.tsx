@@ -13,6 +13,7 @@ import { GenerateInsightButton } from "@/components/contacts/generate-insight-bu
 import { ContactshipTimeline } from "@/components/contacts/contactship-timeline";
 import type { ActionableData } from "@/lib/actionables";
 import type {
+  HubSpotMeetingSummary,
   HubSpotNoteSummary,
   HubSpotTaskSummary,
 } from "@/lib/hubspot/contact-activity";
@@ -31,9 +32,9 @@ interface ContactDetail {
   external_lead_status: string | null;
   calls: CallData[];
   comments: CommentData[];
-  tags: TagData[];
   hubspotNotes: HubSpotNoteSummary[];
   hubspotTasks: HubSpotTaskSummary[];
+  hubspotMeetings: HubSpotMeetingSummary[];
   hubspotActivityError: string | null;
   hasHubSpotContact: boolean;
   timeline: ContactshipTimelineEvent[];
@@ -41,10 +42,12 @@ interface ContactDetail {
 
 interface CallData {
   id: string;
-  call_time: string | null;
+  start_at: string | null;
+  finished_at: string | null;
   duration: number | null;
   direction: "inbound" | "outbound" | null;
-  status: "answered" | "missed" | "rejected" | "busy" | "failed" | null;
+  call_status: string | null;
+  call_result: string | null;
 }
 
 interface CommentData {
@@ -52,12 +55,6 @@ interface CommentData {
   content: string;
   user_name: string | null;
   created_at: string | null;
-}
-
-interface TagData {
-  id: string;
-  name: string;
-  color: string | null;
 }
 
 type PageState =
@@ -137,7 +134,9 @@ export default function ContactDetailPage() {
         ),
       };
     });
-  }, []);
+
+    void loadData(false);
+  }, [loadData]);
 
   if (state.status === "loading") {
     return (
@@ -197,6 +196,7 @@ export default function ContactDetailPage() {
             hasHubSpotContact={contact.hasHubSpotContact}
             notes={contact.hubspotNotes}
             tasks={contact.hubspotTasks}
+            meetings={contact.hubspotMeetings}
             error={contact.hubspotActivityError}
           />
         </div>

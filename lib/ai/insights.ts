@@ -14,24 +14,58 @@ export interface ContactInfo {
 }
 
 export interface CallsStats {
-  total: number;
-  lastDate?: string | null;
-  inboundCount: number;
-  outboundCount: number;
-  answeredRate: number;
+  items: Array<{
+    direction?: string | null;
+    from?: string | null;
+    call_status?: string | null;
+    call_result?: string | null;
+    disconnection_reason?: string | null;
+    start_at?: string | null;
+    finished_at?: string | null;
+    duration?: number | null;
+    analysis_summary?: string | null;
+    analysis_sentiment?: string | null;
+    chat_history?: Array<{ role: string; content: string }>;
+  }>;
 }
 
 export interface CommentsStats {
-  count: number;
-  lastDate?: string | null;
-  lastContent?: string | null;
+  items: Array<{
+    updated_at?: string | null;
+    created_at?: string | null;
+    content: string;
+    user_name?: string | null;
+  }>;
+}
+
+export interface HubSpotActivityContext {
+  notes: Array<{
+    body: string;
+    createdAt?: string | null;
+  }>;
+  tasks: Array<{
+    title: string;
+    body?: string | null;
+    dueAt?: string | null;
+    status?: string | null;
+    priority?: string | null;
+  }>;
+  meetings: Array<{
+    title: string;
+    body?: string | null;
+    internalNotes?: string | null;
+    startAt?: string | null;
+    endAt?: string | null;
+    outcome?: string | null;
+  }>;
+  error?: string | null;
 }
 
 export interface InsightContext {
   contact: ContactInfo;
   calls: CallsStats;
   comments: CommentsStats;
-  tags: string[];
+  hubspot: HubSpotActivityContext;
   organizationObjective?: string;
   organizationInstructions?: string;
   previousActionables?: string[];
@@ -429,9 +463,9 @@ Prioriza siempre la acción más específica y de mayor valor para el contexto d
 La inteligencia artificial debe comportarse como un analista comercial experimentado que recomienda acciones concretas, oportunas y realistas para maximizar la probabilidad de avance de cada contacto.`;
 
 
-const TIMEOUT_MS = 15000;
-const MAX_TOKENS = 900;
-const MAX_RETRY_TOKENS = 1200;
+const TIMEOUT_MS = 30000;
+const MAX_TOKENS = 2500;
+const MAX_RETRY_TOKENS = 3500;
 
 function normalizeJsonCandidate(raw: string): string {
   return raw
@@ -749,7 +783,7 @@ async function requestInsightCompletion(
 }
 
 function buildContextPrompt(ctx: InsightContext): string {
-  const { contact, calls, comments, tags } = ctx;
+  const { contact, calls, comments, hubspot } = ctx;
   const now = new Date();
 
   const lines: string[] = [];
@@ -782,20 +816,86 @@ function buildContextPrompt(ctx: InsightContext): string {
 
   lines.push("");
   lines.push("## Actividad de llamadas");
-  lines.push(`Total llamadas: ${calls.total}`);
-  lines.push(`Entrantes: ${calls.inboundCount} | Salientes: ${calls.outboundCount}`);
-  lines.push(`Tasa de respuesta: ${Math.round(calls.answeredRate * 100)}%`);
-  if (calls.lastDate) lines.push(`Última llamada: ${calls.lastDate}`);
+  if (calls.items.length === 0) {
+    lines.push("Sin llamadas registradas en ContactShip.");
+  } else {
+    for (const [index, call] of calls.items.entries()) {
+      lines.push(`### Llamada ${index + 1}`);
+      if (call.direction) lines.push(`Dirección: ${call.direction}`);
+      if (call.from) lines.push(`Origen telefónico: ${call.from}`);
+      if (call.call_status) lines.push(`Estado técnico: ${call.call_status}`);
+      if (call.call_result) lines.push(`Resultado: ${call.call_result}`);
+      if (call.disconnection_reason) {
+        lines.push(`Motivo de desconexión: ${call.disconnection_reason}`);
+      }
+      if (call.start_at) lines.push(`Inicio: ${call.start_at}`);
+      if (call.finished_at) lines.push(`Fin: ${call.finished_at}`);
+      if (call.duration != null) lines.push(`Duración segundos: ${call.duration}`);
+      if (call.analysis_summary) lines.push(`Resumen: ${call.analysis_summary}`);
+      if (call.analysis_sentiment) lines.push(`Sentimiento: ${call.analysis_sentiment}`);
+      if (call.chat_history && call.chat_history.length > 0) {
+        lines.push("Conversación:");
+        for (const message of call.chat_history.slice(0, 8)) {
+          lines.push(`- ${message.role}: ${message.content}`);
+        }
+      }
+    }
+  }
 
   lines.push("");
   lines.push("## Comentarios");
-  lines.push(`Total comentarios: ${comments.count}`);
-  if (comments.lastDate) lines.push(`Último comentario: ${comments.lastDate}`);
-  if (comments.lastContent) lines.push(`Contenido reciente: "${comments.lastContent}"`);
+  if (comments.items.length === 0) {
+    lines.push("Sin comentarios registrados en ContactShip.");
+  } else {
+    for (const [index, comment] of comments.items.entries()) {
+      lines.push(`### Comentario ${index + 1}`);
+      if (comment.updated_at) lines.push(`Actualizado: ${comment.updated_at}`);
+      if (comment.created_at) lines.push(`Creado: ${comment.created_at}`);
+      if (comment.user_name) lines.push(`Usuario: ${comment.user_name}`);
+      lines.push(`Contenido: ${comment.content}`);
+    }
+  }
 
-  if (tags.length > 0) {
-    lines.push("");
-    lines.push(`## Etiquetas: ${tags.join(", ")}`);
+  lines.push("");
+  lines.push("## Actividad de HubSpot");
+  if (hubspot.error) {
+    lines.push(`Error al consultar HubSpot: ${hubspot.error}`);
+  }
+
+  lines.push("### Notas");
+  if (hubspot.notes.length === 0) {
+    lines.push("Sin notas asociadas.");
+  } else {
+    for (const [index, note] of hubspot.notes.entries()) {
+      lines.push(`Nota ${index + 1}${note.createdAt ? ` (${note.createdAt})` : ""}: ${note.body}`);
+    }
+  }
+
+  lines.push("### Tareas");
+  if (hubspot.tasks.length === 0) {
+    lines.push("Sin tareas asociadas.");
+  } else {
+    for (const [index, task] of hubspot.tasks.entries()) {
+      lines.push(`Tarea ${index + 1}: ${task.title}`);
+      if (task.body) lines.push(`Detalle: ${task.body}`);
+      if (task.dueAt) lines.push(`Fecha: ${task.dueAt}`);
+      if (task.status) lines.push(`Estado: ${task.status}`);
+      if (task.priority) lines.push(`Prioridad: ${task.priority}`);
+    }
+  }
+
+  lines.push("### Meetings");
+  if (hubspot.meetings.length === 0) {
+    lines.push("Sin meetings asociados.");
+  } else {
+    for (const [index, meeting] of hubspot.meetings.entries()) {
+      lines.push(`Meeting ${index + 1}: ${meeting.title}`);
+      if (meeting.body) lines.push(`Detalle: ${meeting.body}`);
+      if (meeting.internalNotes) lines.push(`Notas internas: ${meeting.internalNotes}`);
+      if (meeting.startAt) lines.push(`Inicio: ${meeting.startAt}`);
+      if (meeting.endAt) lines.push(`Fin: ${meeting.endAt}`);
+      if (meeting.outcome) lines.push(`Resultado: ${meeting.outcome}`);
+    }
   }
 
   if (ctx.previousActionables && ctx.previousActionables.length > 0) {

@@ -13,12 +13,12 @@ export {
 } from "./contacts";
 export { getCallsByContactId } from "./calls";
 export { getCommentsByContactId } from "./comments";
-export { getAllTags, getTagsByContactId } from "./tags";
 export {
   createActionable,
   getActionableById,
   getActionablesByContactId,
   updateActionableActions,
+  updateActionableActionAtomically,
 } from "./actionables";
 export {
   createSyncTask,
