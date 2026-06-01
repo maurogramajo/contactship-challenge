@@ -1,0 +1,14 @@
+# Netlify configuration for ContactShip + HubSpot
+# Next.js app with Scheduled Function for HubSpot sync
+
+[build]
+  command = "bun run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  BUN_VERSION = "1.3.11"
+
+# Next.js plugin — handles SSR, ISR, API routes, and function bundling
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
