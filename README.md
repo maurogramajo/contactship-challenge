@@ -44,8 +44,6 @@ cp .env.example .env.local
 #    - AUTH_SECRET: secreto de al menos 32 caracteres para firmar JWT
 #    - HUBSPOT_CLIENT_ID, HUBSPOT_CLIENT_SECRET, HUBSPOT_REDIRECT_URI
 #    - WEBHOOK_SECRET: secreto usado para validar webhooks de HubSpot
-#    Opcionales:
-#    - SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 # 4. Instalar dependencias
 bun install

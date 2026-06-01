@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { processNextPendingSyncTask } from "../lib/sync-tasks";
+import { processPendingSyncTasks } from "../lib/sync-tasks";
 
 config({ path: ".env.local" });
 config();
@@ -10,7 +10,7 @@ async function runOnce(trigger: "manual" | "startup" | "interval") {
   const startedAt = new Date();
 
   try {
-    const result = await processNextPendingSyncTask();
+    const result = await processPendingSyncTasks();
     console.info(
       `[sync-hubspot-cron] trigger=${trigger} at=${startedAt.toISOString()} result=${JSON.stringify(result)}`,
     );

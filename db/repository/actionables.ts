@@ -5,7 +5,7 @@ import {
   normalizeActionableRecord,
   type StoredContactActionable,
 } from "@/lib/actionables";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 export interface CreateActionableInput {
   contact_id: string;
@@ -98,6 +98,12 @@ export async function updateActionableActionAtomically(
   transformFn: (action: ActionableAction) => ActionableAction,
 ): Promise<StoredContactActionable | null> {
   return db.transaction(async (tx) => {
+    // pg_advisory_xact_lock is a PostgreSQL session-level lock that
+    // serializes concurrent access to the same actionable. It is
+    // automatically released at transaction commit/rollback.
+    const lockId = hashStringToInt32(actionableId);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${lockId})`);
+
     const [record] = await tx
       .select()
       .from(contactActionables)
@@ -106,8 +112,7 @@ export async function updateActionableActionAtomically(
           eq(contactActionables.id, actionableId),
           eq(contactActionables.organization_id, organizationId),
         ),
-      )
-      .for("update");
+      );
 
     if (!record) return null;
 
@@ -129,4 +134,14 @@ export async function updateActionableActionAtomically(
 
     return updated ? normalizeActionableRecord(updated) : null;
   });
+}
+
+function hashStringToInt32(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
+  }
+  return hash;
 }

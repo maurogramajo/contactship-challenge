@@ -513,3 +513,19 @@ export async function processNextPendingSyncTask() {
 
   return processActionSyncTask(task);
 }
+
+export async function processPendingSyncTasks(maxCount = 10) {
+  const results: Array<{ status: string; taskId?: string; error?: string }> = [];
+
+  for (let i = 0; i < maxCount; i++) {
+    const result = await processNextPendingSyncTask();
+    results.push(result);
+
+    if (result.status === "idle") break;
+  }
+
+  return {
+    processed: results.filter((r) => r.status !== "idle").length,
+    results,
+  };
+}
