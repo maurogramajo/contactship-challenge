@@ -61,7 +61,7 @@ const TESTS: Array<{
     condition: "connected",
     description:
       "Crea 2 contactos con notas, tareas, meetings, llamadas y comentarios en distintos estados.",
-    outcome: "Permite comparar el razonamiento del insight segun actividad y madurez del contacto.",
+    outcome: "Permite comparar el razonamiento del insight según actividad y madurez del contacto.",
   },
 ];
 
@@ -125,11 +125,11 @@ export default function TestDataPage() {
               Testing
             </p>
             <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
-              Data de prueba rapida
+              Data de prueba rápida
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Ejecuta escenarios para validar listado de contactos, cola de sync
-              y generacion de insights con contexto real.
+              y generación de insights con contexto real.
             </p>
           </div>
 
@@ -189,7 +189,7 @@ export default function TestDataPage() {
                   </p>
                   <h2 className="mt-1 text-lg font-semibold text-slate-950">
                     {test.key === "hubspot-basic"
-                      ? "HubSpot basico"
+                      ? "HubSpot básico"
                       : test.key === "local-queue"
                         ? "Cola local"
                         : "Insight avanzado"}
@@ -230,7 +230,7 @@ export default function TestDataPage() {
       {results.length > 0 ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">
-            Ultimas ejecuciones
+            Últimas ejecuciones
           </h2>
           <div className="mt-4 space-y-4">
             {results.map((result, index) => (

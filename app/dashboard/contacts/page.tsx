@@ -230,7 +230,7 @@ export default function ContactsPage() {
               Contactos
             </h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Busca coincidencias por nombre, email o teléfono.
+              Buscá coincidencias por nombre, email o teléfono.
             </p>
           </div>
           <div className="h-fit rounded-2xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm sm:min-w-32 sm:self-start">

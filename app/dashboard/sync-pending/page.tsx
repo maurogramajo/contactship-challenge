@@ -38,7 +38,7 @@ export default async function SyncPendingPage() {
           Sync Pendientes
         </h1>
         <p className="max-w-3xl text-sm leading-6 text-slate-600">
-          Visualiza el estado de las sincronizaciones pendientes, completadas y fallidas con HubSpot.
+          Visualizar el estado de las sincronizaciones pendientes, completadas y fallidas con HubSpot.
         </p>
       </section>
 
@@ -47,7 +47,7 @@ export default async function SyncPendingPage() {
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                <th className="px-4 py-3">Fecha creación</th>
+                <th className="px-4 py-3">Fecha de creación</th>
                 <th className="px-4 py-3">Tipo</th>
                 <th className="px-4 py-3">Estado</th>
                 <th className="px-4 py-3">Retry Count</th>

@@ -56,9 +56,9 @@ const DEFAULT_VALUES: CreateContactFormState = {
 
 const ADDITIONAL_DATA_TYPES = [
   { value: "text", label: "Texto" },
-  { value: "number", label: "Numero" },
+  { value: "number", label: "Número" },
   { value: "date", label: "Fecha" },
-  { value: "location", label: "Ubicacion" },
+  { value: "location", label: "Ubicación" },
 ];
 
 export function CreateContactModal({
@@ -156,8 +156,8 @@ export function CreateContactModal({
               Crear contacto
             </h2>
             <p id={descriptionId} className="max-w-2xl text-sm leading-6 text-slate-600">
-              Se creara en ContactShip
-              {hubSpotConnected ? " y tambien en HubSpot" : ""}. El telefono debe
+              Se creará en ContactShip
+              {hubSpotConnected ? " y también en HubSpot" : ""}. El teléfono debe
               estar en formato internacional, por ejemplo{" "}
               <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700">
                 +5491123456789
@@ -196,7 +196,7 @@ export function CreateContactModal({
               />
             </FormField>
 
-            <FormField label="Telefono" error={errors.phone_number?.message}>
+            <FormField label="Teléfono" error={errors.phone_number?.message}>
               <input
                 {...register("phone_number")}
                 type="tel"
@@ -214,7 +214,7 @@ export function CreateContactModal({
               />
             </FormField>
 
-            <FormField label="Pais" error={errors.country?.message}>
+            <FormField label="País" error={errors.country?.message}>
               <input
                 {...register("country")}
                 placeholder="Argentina"
@@ -223,7 +223,7 @@ export function CreateContactModal({
             </FormField>
           </div>
 
-          <FormField label="Descripcion" error={errors.description?.message}>
+          <FormField label="Descripción" error={errors.description?.message}>
             <Controller
               name="description"
               control={control}
@@ -260,7 +260,7 @@ export function CreateContactModal({
 
             {fields.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-4 text-sm text-slate-500">
-                No agregaste datos adicionales todavia.
+                No agregaste datos adicionales todavía.
               </div>
             ) : null}
 

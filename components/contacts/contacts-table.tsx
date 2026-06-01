@@ -126,7 +126,7 @@ export function ContactsTable({
       loading={loading}
       error={error || null}
       emptyTitle="No se encontraron contactos"
-      emptyDescription="Intenta ajustar los filtros de búsqueda."
+      emptyDescription="Intentá ajustar los filtros de búsqueda."
       pagination={
         result && result.totalPages > 0
           ? {

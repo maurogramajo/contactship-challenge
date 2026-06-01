@@ -221,7 +221,7 @@ export default function SettingsPage() {
                     />
                   </svg>
                 )}
-                Probar Conexión
+                Probar conexión
               </button>
               <button
                 type="button"
