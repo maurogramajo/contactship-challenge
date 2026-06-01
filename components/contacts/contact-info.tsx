@@ -11,6 +11,8 @@ interface ContactInfoData {
   source: string | null;
   description: string | null;
   external_id: string | null;
+  external_lifecycle_stage: string | null;
+  external_lead_status: string | null;
 }
 
 interface ContactInfoProps {
@@ -30,66 +32,98 @@ function sourceLabel(source: string | null): string {
 export function ContactInfo({ contact }: ContactInfoProps) {
   return (
     <div className="rounded-xl border border-border bg-surface p-6 shadow-card">
-      <div className="flex items-start justify-between gap-4">
-        <h1 className="text-2xl font-bold text-text-primary">
-          {contact.full_name ?? "Sin nombre"}
-        </h1>
-        <Badge variant={sourceVariant(contact.source)}>
-          {sourceLabel(contact.source)}
-        </Badge>
+      <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-text-tertiary">
+            Perfil principal
+          </p>
+          <h1 className="mt-1 text-2xl font-bold text-text-primary">
+            {contact.full_name ?? "Sin nombre"}
+          </h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-text-secondary">
+            {contact.description?.trim() || "Sin contexto cargado todavía para este contacto."}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={sourceVariant(contact.source)}>
+            {contact.source === "hubspot"
+              ? `HubSpot #${contact.external_id ?? "—"}`
+              : sourceLabel(contact.source)}
+          </Badge>
+        </div>
       </div>
 
-      <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {contact.email && (
-          <Field label="Email">
+      <dl className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Field label="Email">
+          {contact.email ? (
             <a
               href={`mailto:${contact.email}`}
-              className="text-primary hover:text-primary-hover transition-colors"
+              className="text-primary transition-colors hover:text-primary-hover"
             >
               {contact.email}
             </a>
-          </Field>
-        )}
-        {contact.phone_number && (
-          <Field label="Teléfono">
+          ) : (
+            <MutedValue value="Sin email" />
+          )}
+        </Field>
+
+        <Field label="Teléfono">
+          {contact.phone_number ? (
             <a
               href={`tel:${contact.phone_number}`}
-              className="text-primary hover:text-primary-hover transition-colors"
+              className="text-primary transition-colors hover:text-primary-hover"
             >
               {contact.phone_number}
             </a>
-          </Field>
-        )}
-        {contact.country && (
-          <Field label="País">{contact.country}</Field>
-        )}
-        {contact.external_id && contact.source === "hubspot" && (
-          <Field label="HubSpot ID">
-            <code className="rounded bg-surface-tertiary px-1.5 py-0.5 text-xs font-mono text-text-secondary">
-              {contact.external_id}
-            </code>
-          </Field>
-        )}
-      </dl>
+          ) : (
+            <MutedValue value="Sin teléfono" />
+          )}
+        </Field>
 
-      {contact.description && (
-        <div className="mt-6 border-t border-border pt-4">
-          <p className="text-sm leading-relaxed text-text-secondary">
-            {contact.description}
-          </p>
-        </div>
-      )}
+        <Field label="País">
+          {contact.country ? (
+            contact.country
+          ) : (
+            <MutedValue value="Sin país" />
+          )}
+        </Field>
+
+        <Field label="Lifecycle Stage">
+          {contact.external_lifecycle_stage ? (
+            <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 capitalize">
+              {contact.external_lifecycle_stage}
+            </span>
+          ) : (
+            <MutedValue value="Sin clasificar" />
+          )}
+        </Field>
+
+        <Field label="Lead Status">
+          {contact.external_lead_status ? (
+            <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+              {contact.external_lead_status}
+            </span>
+          ) : (
+            <MutedValue value="Sin clasificar" />
+          )}
+        </Field>
+      </dl>
     </div>
   );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div className="rounded-xl border border-border-light bg-surface-secondary p-4">
       <dt className="text-xs font-medium text-text-tertiary uppercase tracking-wide">
         {label}
       </dt>
-      <dd className="mt-1 text-sm text-text-primary">{children}</dd>
+      <dd className="mt-2 text-sm text-text-primary">{children}</dd>
     </div>
   );
+}
+
+function MutedValue({ value }: { value: string }) {
+  return <span className="text-text-tertiary">{value}</span>;
 }

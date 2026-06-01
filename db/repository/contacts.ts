@@ -21,6 +21,8 @@ export interface GetContactsFilters {
   source?: "hubspot";
   sort?: "created_at" | "full_name" | "email";
   extraConditions?: SQL[];
+  lifecycleStage?: string;
+  leadStatus?: string;
 }
 
 export interface PaginatedResponse {
@@ -47,6 +49,14 @@ function buildContactsWhereClause(filters: GetContactsFilters): SQL | undefined 
 
   if (filters.source) {
     conditions.push(eq(contacts.source, filters.source));
+  }
+
+  if (filters.lifecycleStage) {
+    conditions.push(eq(contacts.external_lifecycle_stage, filters.lifecycleStage));
+  }
+
+  if (filters.leadStatus) {
+    conditions.push(eq(contacts.external_lead_status, filters.leadStatus));
   }
 
   if (filters.extraConditions?.length) {
@@ -127,6 +137,24 @@ export async function getContactByExternalId(
   return result[0] ?? null;
 }
 
+export async function getContactByPhoneNumber(
+  phoneNumber: string,
+  organizationId: string,
+): Promise<Contact | null> {
+  const result = await db
+    .select()
+    .from(contacts)
+    .where(
+      and(
+        eq(contacts.organization_id, organizationId),
+        eq(contacts.phone_number, phoneNumber),
+      ),
+    )
+    .limit(1);
+
+  return result[0] ?? null;
+}
+
 export async function createContact(
   data: NewContact
 ): Promise<Contact> {
@@ -166,6 +194,8 @@ export async function upsertContactByExternalId(
         phone_number: sql`excluded.phone_number`,
         country: sql`excluded.country`,
         description: sql`excluded.description`,
+        external_lifecycle_stage: sql`excluded.external_lifecycle_stage`,
+        external_lead_status: sql`excluded.external_lead_status`,
         updated_at: sql`excluded.updated_at`,
       },
     })

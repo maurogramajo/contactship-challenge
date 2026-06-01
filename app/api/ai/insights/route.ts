@@ -3,6 +3,7 @@ import { z } from "zod";
 import { buildContactContext } from "@/lib/ai/build-context";
 import { generateContactInsight } from "@/lib/ai/insights";
 import { createActionable } from "@/db/repository/actionables";
+import { toActionableData } from "@/lib/actionables";
 import { ensureLocalContactForActionables } from "@/lib/contacts";
 import { getCurrentOrganization } from "@/lib/session";
 
@@ -11,6 +12,14 @@ const NO_STORE = { "Cache-Control": "no-store" };
 const bodySchema = z.object({
   contactId: z.string().min(1),
 });
+
+function normalizeContactId(contactId: string): string {
+  try {
+    return decodeURIComponent(contactId);
+  } catch {
+    return contactId;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,7 +45,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { contactId } = parsed.data;
+    const contactId = normalizeContactId(parsed.data.contactId);
 
     const localContact = await ensureLocalContactForActionables(
       contactId,
@@ -78,13 +87,11 @@ export async function POST(request: NextRequest) {
       actions: insight.actions,
       snapshot: JSON.parse(JSON.stringify(context)) as Record<string, unknown>,
       recommended_channel: output.recommended_channel,
-      recommended_action: output.recommended_action,
-      draft_message: output.draft_message,
       reasoning: output.reasoning,
     });
 
     return NextResponse.json(
-      { actionable },
+      { actionable: toActionableData(actionable) },
       { status: 201, headers: NO_STORE }
     );
   } catch (error) {

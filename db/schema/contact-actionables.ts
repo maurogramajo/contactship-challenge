@@ -8,6 +8,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { contacts } from "./contacts";
+import type { ActionableAction } from "@/db/zod/actionable";
 
 export const contactActionables = pgTable("contact_actionables", {
   id: uuid("id")
@@ -16,7 +17,7 @@ export const contactActionables = pgTable("contact_actionables", {
   contact_id: uuid("contact_id").references(() => contacts.id),
   prompt: text("prompt").notNull(),
   summary: text("summary"),
-  actions: jsonb("actions").$type<string[]>().notNull(),
+  actions: jsonb("actions").$type<ActionableAction[]>().notNull(),
   snapshot: jsonb("snapshot").$type<Record<string, unknown>>(),
   organization_id: varchar("organization_id", { length: 255 }),
   recommended_channel: varchar("recommended_channel", { length: 255 }),

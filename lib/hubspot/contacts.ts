@@ -1,6 +1,7 @@
 import type { Client } from "@hubspot/api-client";
 import { getHubSpotClientForOrganization, sleep } from "./client";
 import type { NewContact } from "@/db/schema/contacts";
+import { inferHubSpotLeadClassification } from "@/lib/ai/hubspot-classification";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ type CreateHubSpotContactInput = {
   full_name: string;
   email?: string | null;
   phone_number?: string | null;
+  description?: string | null;
+  additional_data?: NewContact["additional_data"];
+  lifecycleStage?: string | null;
+  leadStatus?: string | null;
 };
 
 // ── Retry helper ───────────────────────────────────────────────────────────
@@ -201,9 +206,15 @@ export async function createHubSpotContact(
 ): Promise<HubSpotContact> {
   const client = await getHubSpotClientForOrganization(organizationId);
   const { firstname, lastname } = splitFullName(input.full_name);
+  const classification = await inferHubSpotLeadClassification({
+    description: input.description ?? null,
+    additional_data: input.additional_data,
+  });
   const properties: Record<string, string> = {
     firstname,
     lastname,
+    lifecyclestage: input.lifecycleStage ?? classification.lifecycleStage,
+    hs_lead_status: input.leadStatus ?? classification.leadStatus,
   };
 
   if (input.email) {
@@ -247,5 +258,7 @@ export function mapHubSpotContactToOurModel(
     organization_id: organizationId,
     country: null,
     description: p.lifecyclestage ?? p.hs_lead_status ?? null,
+    external_lifecycle_stage: p.lifecyclestage ?? null,
+    external_lead_status: p.hs_lead_status ?? null,
   };
 }

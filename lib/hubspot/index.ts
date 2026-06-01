@@ -21,3 +21,13 @@ export {
   type WebhookEvent,
 } from "./webhook";
 export { createHubSpotNote, HubSpotNotesError } from "./notes";
+export {
+  getHubSpotContactActivity,
+  type HubSpotContactActivity,
+  type HubSpotNoteSummary,
+  type HubSpotTaskSummary,
+} from "./contact-activity";
+export {
+  executeHubSpotAction,
+  HubSpotActionExecutionError,
+} from "./actionables";

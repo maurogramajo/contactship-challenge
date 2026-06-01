@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentOrganization } from "@/lib/session";
 import { createHubSpotNote, HubSpotNotesError } from "@/lib/hubspot";
-import { getHubSpotExternalIdFromContactId } from "@/lib/contacts";
+import { resolveHubSpotExternalIdForContactIdentifier } from "@/lib/contacts";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
@@ -37,7 +37,10 @@ export async function POST(request: NextRequest) {
     const { contactId, note } = parsed.data;
 
     // Resolve the real HubSpot external contact ID
-    const externalId = getHubSpotExternalIdFromContactId(contactId);
+    const externalId = await resolveHubSpotExternalIdForContactIdentifier(
+      contactId,
+      organization.id,
+    );
     if (!externalId) {
       return NextResponse.json(
         { error: "Contact does not have a HubSpot external ID", code: 400 },
@@ -53,16 +56,6 @@ export async function POST(request: NextRequest) {
       );
     } catch (error) {
       if (error instanceof HubSpotNotesError) {
-        if (error.code === 403) {
-          return NextResponse.json(
-            {
-              error: "HubSpot scope missing",
-              code: 403,
-              required_scope: "crm.objects.notes.write",
-            },
-            { status: 403, headers: NO_STORE },
-          );
-        }
         if (error.code === 400) {
           return NextResponse.json(
             { error: "HubSpot not connected", code: 400 },

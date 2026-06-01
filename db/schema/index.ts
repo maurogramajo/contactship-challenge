@@ -4,6 +4,7 @@ import { calls } from "./calls";
 import { comments } from "./comments";
 import { tags, contactTags } from "./tags";
 import { contactActionables } from "./contact-actionables";
+import { syncTasks } from "./sync-tasks";
 import { organizations } from "./organizations";
 import { organizationRefreshTokens } from "./organization-refresh-tokens";
 import { hubspotConnections } from "./hubspot-connections";
@@ -15,6 +16,7 @@ export const contactsRelations = relations(contacts, ({ many }) => ({
   calls: many(calls),
   comments: many(comments),
   actionables: many(contactActionables),
+  syncTasks: many(syncTasks),
   contactTags: many(contactTags),
 }));
 
@@ -40,13 +42,27 @@ export const commentsRelations = relations(comments, ({ one }) => ({
 
 export const contactActionablesRelations = relations(
   contactActionables,
-  ({ one }) => ({
+  ({ many, one }) => ({
     contact: one(contacts, {
       fields: [contactActionables.contact_id],
       references: [contacts.id],
     }),
+    syncTasks: many(syncTasks),
   }),
 );
+
+// ── Sync Tasks ─────────────────────────────────────────────────────────────
+
+export const syncTasksRelations = relations(syncTasks, ({ one }) => ({
+  contact: one(contacts, {
+    fields: [syncTasks.contact_id],
+    references: [contacts.id],
+  }),
+  actionable: one(contactActionables, {
+    fields: [syncTasks.actionable_id],
+    references: [contactActionables.id],
+  }),
+}));
 
 // ── Tags ──────────────────────────────────────────────────────────────────
 
@@ -118,6 +134,7 @@ export { calls } from "./calls";
 export { comments } from "./comments";
 export { tags, contactTags } from "./tags";
 export { contactActionables } from "./contact-actionables";
+export { syncTasks } from "./sync-tasks";
 export { organizations } from "./organizations";
 export { organizationRefreshTokens } from "./organization-refresh-tokens";
 export { hubspotConnections } from "./hubspot-connections";
@@ -144,5 +161,6 @@ export type {
   ContactActionable,
   NewContactActionable,
 } from "./contact-actionables";
+export type { SyncTask, NewSyncTask } from "./sync-tasks";
 export { sourceEnum } from "./contacts";
 export { directionEnum, statusEnum } from "./calls";

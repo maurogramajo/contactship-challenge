@@ -1,8 +1,6 @@
 import { getHubSpotClientForOrganization } from "./client";
 import { getHubSpotConnectionByOrganizationId } from "@/db/repository";
 
-const REQUIRED_SCOPE = "crm.objects.notes.write";
-
 export class HubSpotNotesError extends Error {
   code: number;
   constructor(message: string, code: number) {
@@ -17,22 +15,13 @@ export async function createHubSpotNote(
   contactId: string,
   noteBody: string,
 ): Promise<{ id: string }> {
-  // 1. Check scope
   const connection = await getHubSpotConnectionByOrganizationId(organizationId);
   if (!connection) {
     throw new HubSpotNotesError("HubSpot is not connected for this organization.", 400);
   }
-  if (!connection.scopes.includes(REQUIRED_SCOPE)) {
-    throw new HubSpotNotesError(
-      `Missing required scope: ${REQUIRED_SCOPE}`,
-      403,
-    );
-  }
 
-  // 2. Get authenticated client
   const client = await getHubSpotClientForOrganization(organizationId);
 
-  // 3. Create the note via CRM Objects API
   try {
     const response = await client.crm.objects.notes.basicApi.create({
       properties: {

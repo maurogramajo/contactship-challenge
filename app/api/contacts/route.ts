@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createUnifiedContact, getUnifiedContacts } from "@/lib/contacts";
+import { createContactInputSchema } from "@/db/zod";
+import {
+  createUnifiedContact,
+  DuplicateContactError,
+  getUnifiedContacts,
+} from "@/lib/contacts";
 import { getCurrentOrganization } from "@/lib/session";
 
 const listQuerySchema = z.object({
@@ -8,14 +13,8 @@ const listQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().optional(),
   source: z.enum(["hubspot"]).optional(),
-});
-
-const createContactSchema = z.object({
-  full_name: z.string().trim().min(1, "El nombre es obligatorio"),
-  email: z.email().nullish(),
-  phone_number: z.string().trim().nullish(),
-  country: z.string().trim().nullish(),
-  description: z.string().trim().nullish(),
+  lifecycle_stage: z.string().optional(),
+  lead_status: z.string().optional(),
 });
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -41,7 +40,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { page, limit, search, source } = parsed.data;
+    const { page, limit, search, source, lifecycle_stage, lead_status } = parsed.data;
 
     const result = await getUnifiedContacts({
       organizationId: organization.id,
@@ -49,6 +48,8 @@ export async function GET(request: NextRequest) {
       limit,
       search,
       source,
+      lifecycleStage: lifecycle_stage,
+      leadStatus: lead_status,
     });
 
     return NextResponse.json(result, { headers: NO_STORE });
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const parsed = createContactSchema.safeParse(body);
+    const parsed = createContactInputSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid contact payload", code: 400, details: parsed.error.issues },
@@ -89,10 +90,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const contact = await createUnifiedContact(organization.id, parsed.data);
+    const result = await createUnifiedContact(organization.id, parsed.data);
 
-    return NextResponse.json({ contact }, { status: 201, headers: NO_STORE });
+    return NextResponse.json(
+      result,
+      { status: result.syncPending ? 202 : 201, headers: NO_STORE },
+    );
   } catch (error) {
+    if (error instanceof DuplicateContactError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.code, headers: NO_STORE },
+      );
+    }
+
     console.error("POST /api/contacts error:", error);
     return NextResponse.json(
       { error: "Internal server error", code: 500 },

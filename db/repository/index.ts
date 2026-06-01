@@ -12,7 +12,20 @@ export {
 export { getCallsByContactId } from "./calls";
 export { getCommentsByContactId } from "./comments";
 export { getAllTags, getTagsByContactId } from "./tags";
-export { createActionable, getActionablesByContactId } from "./actionables";
+export {
+  createActionable,
+  getActionableById,
+  getActionablesByContactId,
+  updateActionableActions,
+} from "./actionables";
+export {
+  createSyncTask,
+  listSyncTasksByOrganizationId,
+  getOldestPendingSyncTask,
+  getLatestOpenSyncTaskForResource,
+  updateSyncTask,
+  completeOpenSyncTasksForResource,
+} from "./sync-tasks";
 export {
   createOrganization,
   getOrganizationByEmail,

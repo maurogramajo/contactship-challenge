@@ -8,6 +8,8 @@ import {
   getLocalMaterializedContactByIdentifier,
   getUnifiedContactById,
 } from "@/lib/contacts";
+import { buildContactshipTimeline } from "@/lib/contactship/timeline";
+import { getHubSpotContactActivity } from "@/lib/hubspot/contact-activity";
 import { getCurrentOrganization } from "@/lib/session";
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -47,12 +49,24 @@ export async function GET(
         ])
       : [[], [], []];
 
+    const hubspotActivity = await getHubSpotContactActivity(id, organization.id);
+    const timeline = buildContactshipTimeline({
+      contact,
+      calls,
+      comments,
+    });
+
     return NextResponse.json(
       {
         ...contact,
         calls,
         comments,
         tags,
+        hubspotNotes: hubspotActivity.notes,
+        hubspotTasks: hubspotActivity.tasks,
+        hubspotActivityError: hubspotActivity.error,
+        hasHubSpotContact: hubspotActivity.hasHubSpotContact,
+        timeline,
       },
       { headers: NO_STORE }
     );

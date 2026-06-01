@@ -1,30 +1,17 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { ContactActionable } from "@/db/schema/contact-actionables";
 import { InsightsPanel } from "./insights-panel";
 import { GenerateInsightButton } from "./generate-insight-button";
 import type { Contact } from "@/db/schema/contacts";
-
-interface ActionableData {
-  id: string;
-  summary: string | null;
-  actions: string[];
-  created_at: string;
-}
-
-function toActionableData(a: ContactActionable): ActionableData {
-  return {
-    id: a.id,
-    summary: a.summary,
-    actions: a.actions as string[],
-    created_at: String(a.created_at),
-  };
-}
+import {
+  type ActionableData,
+  type StoredContactActionable,
+} from "@/lib/actionables";
 
 interface ContactDetailClientProps {
   contact: Contact;
-  initialInsights: ContactActionable[];
+  initialInsights: StoredContactActionable[];
 }
 
 export default function ContactDetailClient({
@@ -32,7 +19,15 @@ export default function ContactDetailClient({
   initialInsights,
 }: ContactDetailClientProps) {
   const [insights, setInsights] = useState<ActionableData[]>(
-    initialInsights.map(toActionableData),
+    initialInsights.map((item) => ({
+      id: item.id,
+      summary: item.summary,
+      actions: item.actions,
+      created_at: String(item.created_at),
+      recommended_channel: item.recommended_channel,
+      draft_message: item.draft_message,
+      reasoning: item.reasoning,
+    })),
   );
 
   const handleInsightGenerated = useCallback(
@@ -41,6 +36,12 @@ export default function ContactDetailClient({
     },
     [],
   );
+
+  const handleActionableUpdated = useCallback((updated: ActionableData) => {
+    setInsights((prev) =>
+      prev.map((item) => (item.id === updated.id ? updated : item)),
+    );
+  }, []);
 
   return (
     <div className="min-h-full">
@@ -81,6 +82,16 @@ export default function ContactDetailClient({
                     {contact.source}
                   </span>
                 )}
+                {contact.external_lifecycle_stage && (
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 capitalize">
+                    {contact.external_lifecycle_stage}
+                  </span>
+                )}
+                {contact.external_lead_status && (
+                  <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                    {contact.external_lead_status}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -94,7 +105,10 @@ export default function ContactDetailClient({
 
       <main className="mx-auto max-w-4xl px-6 py-8">
         <section>
-          <InsightsPanel actionables={insights} />
+          <InsightsPanel
+            actionables={insights}
+            onActionableUpdated={handleActionableUpdated}
+          />
         </section>
       </main>
     </div>

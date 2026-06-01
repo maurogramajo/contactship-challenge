@@ -75,6 +75,24 @@ const columns: Column<Contact>[] = [
     render: (row: Contact): ReactNode => <SourceBadge source={row.source} />,
   },
   {
+    key: "external_lifecycle_stage",
+    header: "Lifecycle",
+    render: (row: Contact): ReactNode => (
+      <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 capitalize">
+        {row.external_lifecycle_stage || "—"}
+      </span>
+    ),
+  },
+  {
+    key: "external_lead_status",
+    header: "Lead Status",
+    render: (row: Contact): ReactNode => (
+      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+        {row.external_lead_status || "—"}
+      </span>
+    ),
+  },
+  {
     key: "updated_at",
     header: "Última Actividad",
     render: (row: Contact): ReactNode => (

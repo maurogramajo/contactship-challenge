@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { contactSchema } from "@/db/zod/contact";
+import { contactSchema, createContactInputSchema } from "@/db/zod/contact";
 
 describe("contactSchema", () => {
   it("should validate a fully populated contact", () => {
@@ -57,6 +57,46 @@ describe("contactSchema", () => {
       phone_number: "+5491123456789",
       email: "not-an-email",
     });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("createContactInputSchema", () => {
+  it("should require a valid international phone number", () => {
+    const result = createContactInputSchema.safeParse({
+      full_name: "Lucia Perez",
+      phone_number: "1123456789",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("should normalize empty optional fields", () => {
+    const result = createContactInputSchema.safeParse({
+      full_name: "Lucia Perez",
+      phone_number: "+5491123456789",
+      email: "   ",
+      country: "",
+      description: "  ",
+      additional_data: [],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.email).toBeUndefined();
+      expect(result.data.country).toBeUndefined();
+      expect(result.data.description).toBeUndefined();
+      expect(result.data.additional_data).toEqual([]);
+    }
+  });
+
+  it("should validate additional_data items", () => {
+    const result = createContactInputSchema.safeParse({
+      full_name: "Lucia Perez",
+      phone_number: "+5491123456789",
+      additional_data: [{ type: "text", field: "", value: "VIP" }],
+    });
+
     expect(result.success).toBe(false);
   });
 });

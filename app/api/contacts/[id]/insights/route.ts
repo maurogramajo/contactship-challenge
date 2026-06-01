@@ -4,6 +4,7 @@ import {
   getLocalMaterializedContactByIdentifier,
   isHubSpotVirtualContactId,
 } from "@/lib/contacts";
+import { toActionableData } from "@/lib/actionables";
 import { getCurrentOrganization } from "@/lib/session";
 
 const NO_STORE = { "Cache-Control": "no-store" };
@@ -35,7 +36,10 @@ export async function GET(
       ? await getActionablesByContactId(contact.id)
       : [];
 
-    return NextResponse.json(actionables, { headers: NO_STORE });
+    return NextResponse.json(
+      actionables.map(toActionableData),
+      { headers: NO_STORE },
+    );
   } catch (error) {
     console.error("GET /api/contacts/[id]/insights error:", error);
     return NextResponse.json(

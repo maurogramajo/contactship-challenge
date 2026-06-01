@@ -34,6 +34,8 @@ export const contacts = pgTable(
     >(),
     organization_id: varchar("organization_id", { length: 255 }),
     external_id: varchar("external_id", { length: 255 }),
+    external_lifecycle_stage: varchar("external_lifecycle_stage", { length: 50 }),
+    external_lead_status: varchar("external_lead_status", { length: 50 }),
     source: sourceEnum("source"),
   },
   (table) => ({

@@ -67,6 +67,35 @@ El seed crea una cuenta demo para entrar rápido al dashboard:
 - Email: `demo@contactship.local`
 - Password: `demo123456`
 
+## Desarrollo local
+
+Para trabajar localmente con la app y la sincronización diferida de HubSpot conviene usar dos terminales.
+
+### 1. Servidor web
+
+```bash
+bun run dev
+```
+
+Esto levanta la app Next.js en `http://localhost:3000`.
+
+### 2. Cron local por script
+
+```bash
+# Ejecutar una sola corrida
+bun run cron:sync-hubspot
+
+# O dejar el worker local corriendo, procesando una tarea por minuto
+bun run cron:sync-hubspot:watch
+```
+
+El script reutiliza la misma lógica de sincronización que usa producción y está en [scripts/sync-hubspot-cron.ts](./scripts/sync-hubspot-cron.ts).
+
+Si estás desarrollando la cola de sincronización, la forma más simple es:
+
+1. Levantar `bun run dev`
+2. En otra terminal correr `bun run cron:sync-hubspot:watch`
+
 ## Estructura del proyecto
 
 ```
@@ -156,6 +185,8 @@ Las rutas de la App Router (`app/api/`) exponen una API REST consumida tanto por
 | Comando | Descripción |
 |---------|-------------|
 | `bun run dev` | Inicia el servidor de desarrollo (Turbopack) |
+| `bun run cron:sync-hubspot` | Ejecuta una corrida manual del job de sincronización |
+| `bun run cron:sync-hubspot:watch` | Levanta un worker local que ejecuta el job cada minuto |
 | `bun run build` | Compila la app para producción |
 | `bun run start` | Inicia el servidor en modo producción |
 | `bun run lint` | Ejecuta ESLint |
@@ -165,37 +196,55 @@ Las rutas de la App Router (`app/api/`) exponen una API REST consumida tanto por
 | `bun run db:seed` | Carga datos de prueba en la base de datos |
 | `bun run db:studio` | Abre Drizzle Studio para explorar la BD |
 
-## Despliegue en Vercel
+## Despliegue en Netlify
+
+Este proyecto está preparado para desplegarse en Netlify como app Next.js y para ejecutar el job de sincronización con una Scheduled Function nativa.
+
+### Proyecto web
+
+1. Subí el repositorio a GitHub, GitLab o Bitbucket.
+2. En Netlify, creá un nuevo sitio importando ese repositorio.
+3. Configurá estas variables de entorno en el sitio:
+   - `DATABASE_URL`
+   - `AI_API_KEY`
+   - `AI_PROVIDER`
+   - `AI_MODEL`
+   - `AUTH_SECRET`
+   - `HUBSPOT_CLIENT_ID`
+   - `HUBSPOT_CLIENT_SECRET`
+   - `HUBSPOT_REDIRECT_URI`
+   - `WEBHOOK_SECRET` si querés validar webhooks
+4. Usá estos valores de build:
+   - Build command: `bun run build`
+   - Publish directory: dejar vacío para Next.js en Netlify
+5. Antes del primer deploy productivo, ejecutá las migraciones de base de datos:
 
 ```bash
-# 1. Instalar Vercel CLI (opcional, también se puede hacer desde la web)
-bun add -g vercel
-
-# 2. Importar el proyecto
-vercel
-
-# 3. Configurar variables de entorno en el panel de Vercel
-#    Settings > Environment Variables:
-#    Requeridas:
-#    - DATABASE_URL
-#    - AI_API_KEY
-#    - AI_PROVIDER
-#    - AI_MODEL
-#    - AUTH_SECRET
-#    - HUBSPOT_CLIENT_ID
-#    - HUBSPOT_CLIENT_SECRET
-#    - HUBSPOT_REDIRECT_URI
-#    Opcionales:
-#    - SUPABASE_URL
-#    - SUPABASE_ANON_KEY
-#    - SUPABASE_SERVICE_ROLE_KEY
-#    - WEBHOOK_SECRET
-
-# 4. Desplegar
-vercel --prod
+bun run db:migrate
 ```
 
-Alternativamente, importar el repositorio directamente desde el dashboard de Vercel en `vercel.com/new`. La plataforma detecta Next.js automáticamente y aplica la configuración óptima. Las migraciones de base de datos deben ejecutarse manualmente (o mediante un script de build) antes del primer despliegue.
+### Scheduled Function de Netlify
+
+La sincronización diferida con HubSpot está implementada en [netlify/functions/sync-hubspot.ts](./netlify/functions/sync-hubspot.ts).
+
+- Schedule actual: `* * * * *`
+- Ejecuta `processNextPendingSyncTask()` una vez por minuto
+- Procesa una sola tarea pendiente por corrida
+
+No hace falta configurar una URL de cron aparte: la función programada se despliega junto con el sitio.
+
+### Importante sobre Netlify
+
+- La Scheduled Function corre en deploys publicados, no en previews.
+- El cron de Netlify usa UTC.
+- En local, `netlify dev` no la ejecuta automáticamente por horario; para desarrollo local usá `bun run cron:sync-hubspot:watch`.
+
+### Verificación después del deploy
+
+1. Abrí el sitio desplegado.
+2. Generá una acción o contacto que quede `pending`.
+3. Esperá hasta un minuto o ejecutá la función manualmente desde el panel de Netlify.
+4. Revisá la sección `Sync Pendientes` en el dashboard y los logs de la función.
 
 ## Licencia
 

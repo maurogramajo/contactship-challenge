@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "cron:sync-hubspot": "bun run scripts/sync-hubspot-cron.ts",
+    "cron:sync-hubspot:watch": "bun run scripts/sync-hubspot-cron.ts --watch",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,6 +16,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.4.0",
     "@hubspot/api-client": "^13.5.0",
     "@supabase/supabase-js": "^2.106.2",
     "bcryptjs": "^3.0.3",
@@ -25,6 +28,7 @@
     "postgres": "^3.4.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-hook-form": "^7.77.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

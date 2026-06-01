@@ -7,9 +7,16 @@ import { api, ApiError } from "@/lib/api/client";
 import { DetailPageSkeleton } from "@/components/ui/loading-skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ContactInfo } from "@/components/contacts/contact-info";
-import { ActivitySummary } from "@/components/contacts/activity-summary";
+import { HubSpotActivityPanel } from "@/components/contacts/hubspot-activity-panel";
 import { InsightsPanel } from "@/components/contacts/insights-panel";
 import { GenerateInsightButton } from "@/components/contacts/generate-insight-button";
+import { ContactshipTimeline } from "@/components/contacts/contactship-timeline";
+import type { ActionableData } from "@/lib/actionables";
+import type {
+  HubSpotNoteSummary,
+  HubSpotTaskSummary,
+} from "@/lib/hubspot/contact-activity";
+import type { ContactshipTimelineEvent } from "@/lib/contactship/timeline";
 
 interface ContactDetail {
   id: string;
@@ -20,9 +27,16 @@ interface ContactDetail {
   description: string | null;
   external_id: string | null;
   source: string | null;
+  external_lifecycle_stage: string | null;
+  external_lead_status: string | null;
   calls: CallData[];
   comments: CommentData[];
   tags: TagData[];
+  hubspotNotes: HubSpotNoteSummary[];
+  hubspotTasks: HubSpotTaskSummary[];
+  hubspotActivityError: string | null;
+  hasHubSpotContact: boolean;
+  timeline: ContactshipTimelineEvent[];
 }
 
 interface CallData {
@@ -46,33 +60,21 @@ interface TagData {
   color: string | null;
 }
 
-interface ActionableData {
-  id: string;
-  summary: string | null;
-  actions: string[];
-  created_at: string;
-  recommended_channel?: string | null;
-  recommended_action?: string | null;
-  draft_message?: string | null;
-  reasoning?: string | null;
-}
-
-interface HubspotStatusResponse {
-  connected: boolean;
-  hubspotPortalId: string | null;
-  hubspotUserEmail: string | null;
-  hubspotHubDomain: string | null;
-  scopes: string[];
-}
-
 type PageState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "not_found" }
-  | { status: "success"; contact: ContactDetail; actionables: ActionableData[]; hubspotScopes: string[] };
+  | { status: "success"; contact: ContactDetail; actionables: ActionableData[] };
 
 export default function ContactDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const { id: routeId } = useParams<{ id: string }>();
+  const id = (() => {
+    try {
+      return decodeURIComponent(routeId);
+    } catch {
+      return routeId;
+    }
+  })();
   const [state, setState] = useState<PageState>({ status: "loading" });
 
   const loadData = useCallback(async (showLoading = false) => {
@@ -80,19 +82,15 @@ export default function ContactDetailPage() {
       setState({ status: "loading" });
     }
     try {
-      const [contact, actionables, hubspotStatus] = await Promise.all([
+      const [contact, actionables] = await Promise.all([
         api.get<ContactDetail>(`/api/contacts/${id}`),
         api.get<ActionableData[]>(`/api/contacts/${id}/insights`),
-        api
-          .get<HubspotStatusResponse>("/api/hubspot/status")
-          .catch(() => null),
       ]);
 
       setState({
         status: "success",
         contact,
         actionables,
-        hubspotScopes: hubspotStatus?.scopes ?? [],
       });
     } catch (err) {
       if (err instanceof ApiError && err.code === 404) {
@@ -125,6 +123,18 @@ export default function ContactDetailPage() {
       return {
         ...prev,
         actionables: [newActionable, ...prev.actionables],
+      };
+    });
+  }, []);
+
+  const handleActionableUpdated = useCallback((updatedActionable: ActionableData) => {
+    setState((prev) => {
+      if (prev.status !== "success") return prev;
+      return {
+        ...prev,
+        actionables: prev.actionables.map((item) =>
+          item.id === updatedActionable.id ? updatedActionable : item,
+        ),
       };
     });
   }, []);
@@ -166,34 +176,32 @@ export default function ContactDetailPage() {
     );
   }
 
-  const { contact, actionables, hubspotScopes } = state;
+  const { contact, actionables } = state;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <BackLink />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <ContactInfo contact={contact} />
-          <ActivitySummary
-            calls={contact.calls}
-            comments={contact.comments}
-            tags={contact.tags}
-          />
-        </div>
-
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-          <InsightsPanel
-            actionables={actionables}
-            hubspotScopes={hubspotScopes}
-            contactId={id}
-            contactExternalId={contact.external_id}
-          />
+          <ContactInfo contact={contact} />
           <GenerateInsightButton
             contactId={id}
             onSuccess={handleInsightGenerated}
           />
+          <InsightsPanel
+            actionables={actionables}
+            onActionableUpdated={handleActionableUpdated}
+          />
+          <HubSpotActivityPanel
+            hasHubSpotContact={contact.hasHubSpotContact}
+            notes={contact.hubspotNotes}
+            tasks={contact.hubspotTasks}
+            error={contact.hubspotActivityError}
+          />
         </div>
+
+        <ContactshipTimeline events={contact.timeline} />
       </div>
     </div>
   );

@@ -2,17 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { api, ApiError } from "@/lib/api/client";
-
-interface ActionableData {
-  id: string;
-  summary: string | null;
-  actions: string[];
-  created_at: string;
-  recommended_channel?: string | null;
-  recommended_action?: string | null;
-  draft_message?: string | null;
-  reasoning?: string | null;
-}
+import type { ActionableData } from "@/lib/actionables";
 
 interface GenerateInsightButtonProps {
   contactId: string;
