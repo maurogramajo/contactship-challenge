@@ -283,7 +283,13 @@ export async function inferHubSpotLeadClassification(
       return fallback;
     }
 
-    const parsed = JSON.parse(raw);
+    const cleaned = raw
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
     return hubSpotLeadClassificationSchema.parse(parsed);
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) {

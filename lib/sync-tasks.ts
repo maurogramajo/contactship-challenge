@@ -515,13 +515,38 @@ export async function processNextPendingSyncTask() {
 }
 
 export async function processPendingSyncTasks(maxCount = 10) {
-  const results: Array<{ status: string; taskId?: string; error?: string }> = [];
+  const results: Array<{ status: string; taskId?: string; error?: string; organizationId?: string }> = [];
+  const unavailableOrgs = new Set<string>();
 
   for (let i = 0; i < maxCount; i++) {
-    const result = await processNextPendingSyncTask();
-    results.push(result);
+    const task = await getOldestPendingSyncTask();
+    if (!task) {
+      results.push({ status: "idle" });
+      break;
+    }
 
-    if (result.status === "idle") break;
+    if (unavailableOrgs.has(task.organization_id)) {
+      break;
+    }
+
+    const available = await isHubSpotAvailable(task.organization_id);
+    if (!available) {
+      unavailableOrgs.add(task.organization_id);
+      results.push({
+        status: "hubspot_unavailable",
+        organizationId: task.organization_id,
+        taskId: task.id,
+      });
+      break;
+    }
+
+    if (task.type === "create_contact") {
+      const result = await processCreateContactSyncTask(task);
+      results.push(result);
+    } else {
+      const result = await processActionSyncTask(task);
+      results.push(result);
+    }
   }
 
   return {
